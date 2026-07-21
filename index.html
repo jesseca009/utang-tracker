@@ -591,6 +591,9 @@
       <input type="password" id="pinConfirmInput" class="form-input pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••">
       <div class="pin-error hidden" id="pinSetupError">PINs don't match.</div>
       <button class="btn-primary" id="pinSetupBtn" style="width:100%;margin-top:12px;">Set PIN</button>
+      <div class="hidden" id="pinSetupCancelRow" style="margin-top:14px;font-size:0.85rem;">
+        <a href="#" id="pinSetupCancelLink">Cancel</a>
+      </div>
     </div>
   </div>
 </div>
@@ -2075,7 +2078,7 @@
     document.getElementById('loginPanel').classList.remove('hidden');
   }
 
-  function showPinScreen(mode){
+  function showPinScreen(mode, allowCancel){
     document.getElementById('authScreen').classList.add('hidden');
     document.getElementById('pinScreen').classList.remove('hidden');
     document.getElementById('appShell').classList.add('hidden');
@@ -2092,6 +2095,9 @@
     document.getElementById('pinConfirmInput').value = '';
     document.getElementById('pinEntryError').classList.add('hidden');
     document.getElementById('pinSetupError').classList.add('hidden');
+    // Cancel is only offered when changing an existing PIN from inside the app —
+    // never during first-time setup or login gating, where there's nothing to return to.
+    document.getElementById('pinSetupCancelRow').classList.toggle('hidden', !(isSetup && allowCancel));
   }
 
   async function unlockApp(){
@@ -2107,6 +2113,7 @@
     if (!supabaseReady){
       showToast('Add your Supabase URL and key in index.html (see README)');
       document.getElementById('appShell').classList.remove('hidden');
+      await fetchCustomers();
       return;
     }
     const {data: {session}} = await supabase.auth.getSession();
@@ -2230,7 +2237,12 @@
 
   document.getElementById('changePinBtn').addEventListener('click', () => {
     closeModal('globalSettingsModal');
-    showPinScreen('setup');
+    showPinScreen('setup', true);
+  });
+
+  document.getElementById('pinSetupCancelLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    unlockApp();
   });
 
   document.getElementById('logoutBtn').addEventListener('click', async () => {
