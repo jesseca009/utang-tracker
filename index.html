@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Utang Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#F7F6F2;
+    --card-bg:#FFFFFF;
+    --text:#2B2620;
+    --muted:#8A8378;
+    --border:#E8E4DB;
+    --accent:#3D6B4F;
+
+    /* status colors — exact values from spec, solid fills only */
+    --overdue-bg:#FF5A5A;
+    --overdue-text:#FFFFFF;
+    --active-bg:#FFC93C;
+    --active-text:#5C3D00;
+    --paid-bg:#3DDC84;
+    --paid-text:#0A3D1F;
+
+    --radius:14px;
+    --shadow:0 2px 10px rgba(43,38,32,0.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Poppins',sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+  }
+  h1,h2,h3,h4{margin:0 0 8px;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select{font-family:inherit;}
+  .hidden{display:none !important;}
+
+  .topbar{
+    background:var(--card-bg);
+    border-bottom:1px solid var(--border);
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .brand-name{font-weight:700;font-size:1.1rem;}
+  .settings-btn{
+    background:transparent;
+    border:none;
+    font-size:1.3rem;
+    padding:4px 8px;
+    line-height:1;
+    color:var(--muted);
+  }
+
+  .tabs{
+    display:flex;
+    gap:4px;
+    background:var(--card-bg);
+    padding:0 16px 10px;
+    border-bottom:1px solid var(--border);
+    position:sticky;
+    top:53px;
+    z-index:19;
+  }
+  .tab-btn{
+    background:transparent;
+    border:none;
+    padding:8px 14px;
+    border-radius:999px;
+    font-weight:600;
+    font-size:0.85rem;
+    color:var(--muted);
+  }
+  .tab-btn.active{background:var(--bg);color:var(--text);}
+
+  main{max-width:520px;margin:0 auto;padding:16px;padding-bottom:60px;}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .metric-card{
+    background:var(--card-bg);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:18px;
+    text-align:center;
+    margin-bottom:14px;
+  }
+  .metric-label{font-size:0.8rem;color:var(--muted);margin-bottom:4px;}
+  .metric-value{font-size:2rem;font-weight:700;}
+
+  .action-row{
+    display:flex;
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .btn-primary{
+    flex:1;
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:13px 12px;
+    border-radius:10px;
+    font-weight:600;
+    font-size:0.92rem;
+    box-shadow:var(--shadow);
+  }
+  .btn-primary:hover{filter:brightness(0.95);}
+  .btn-secondary{
+    background:var(--card-bg);
+    color:var(--text);
+    border:1px solid var(--border);
+    padding:10px 14px;
+    border-radius:10px;
+    font-weight:600;
+    font-size:0.85rem;
+  }
+  .btn-secondary:hover{background:var(--bg);}
+
+  .search-row{margin-bottom:10px;}
+  .search-input{
+    width:100%;
+    padding:11px 14px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    font-size:0.92rem;
+    background:var(--card-bg);
+  }
+
+  .sort-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+    gap:10px;
+  }
+  .sort-row label{font-size:0.8rem;color:var(--muted);}
+  .sort-select{
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    font-size:0.85rem;
+    background:var(--card-bg);
+  }
+
+  .customer-list{display:flex;flex-direction:column;gap:10px;}
+  .customer-card{
+    border-radius:var(--radius);
+    padding:14px 16px;
+    box-shadow:var(--shadow);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .customer-name{font-weight:700;font-size:1rem;}
+  .customer-status{font-size:0.8rem;opacity:0.9;margin-top:2px;}
+  .customer-total{font-weight:700;font-size:1.05rem;white-space:nowrap;}
+
+  .status-overdue{background:var(--overdue-bg);color:var(--overdue-text);}
+  .status-active{background:var(--active-bg);color:var(--active-text);}
+  .status-paid{background:var(--paid-bg);color:var(--paid-text);}
+
+  .empty-state{
+    text-align:center;
+    color:var(--muted);
+    padding:40px 20px;
+    font-size:0.9rem;
+  }
+
+  .new-customer-row{margin-top:16px;}
+  .new-customer-form{
+    background:var(--card-bg);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:14px;
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+  }
+  .new-customer-form input{
+    flex:1;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    font-size:0.9rem;
+  }
+  .new-customer-note{
+    font-size:0.75rem;
+    color:var(--muted);
+    margin-top:6px;
+  }
+
+  .toast{
+    position:fixed;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    background:var(--text);
+    color:#fff;
+    padding:11px 20px;
+    border-radius:999px;
+    font-size:0.85rem;
+    box-shadow:var(--shadow);
+    z-index:50;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand-name" id="storeNameLabel">My Store</div>
+  <button class="settings-btn" id="settingsBtn" title="Settings">&#9881;</button>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="active">Customers</button>
+  <button class="tab-btn" data-tab="archived">Archived</button>
+</div>
+
+<main>
+
+  <div id="activePanel" class="tab-panel active">
+    <div class="metric-card">
+      <div class="metric-label">Total utang</div>
+      <div class="metric-value" id="totalUtang">&#8369;0</div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn-primary" id="addUtangBtn">Add utang</button>
+      <button class="btn-primary" id="addPaymentBtn">Add payment</button>
+    </div>
+
+    <div class="search-row">
+      <input type="text" class="search-input" id="searchInput" placeholder="Search customers">
+    </div>
+
+    <div class="sort-row">
+      <label for="sortSelect">Sort</label>
+      <select class="sort-select" id="sortSelect">
+        <option value="owed">Most owed</option>
+        <option value="overdue">Most overdue</option>
+        <option value="alpha">Alphabetical</option>
+      </select>
+    </div>
+
+    <div class="customer-list" id="customerList"></div>
+
+    <div class="new-customer-row">
+      <button class="btn-secondary" id="newCustomerToggle">+ New customer</button>
+      <div class="new-customer-form hidden" id="newCustomerForm">
+        <input type="text" id="newCustomerName" placeholder="Customer name">
+        <button class="btn-primary" id="newCustomerSave" style="flex:none;">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="archivedPanel" class="tab-panel">
+    <div class="customer-list" id="archivedList"></div>
+  </div>
+
+</main>
+
+<script>
+  // --- Fill these in from your Supabase project (Project Settings > API) ---
+  const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+  const supabaseReady = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+  const supabase = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+  const STORE_NAME = localStorage.getItem('utang_store_name') || 'My Store';
+  document.getElementById('storeNameLabel').textContent = STORE_NAME;
+
+  let customers = [];
+  let archivedCustomers = [];
+  let currentSort = 'owed';
+
+  function showToast(msg){
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2200);
+  }
+
+  function peso(n){
+    return '₱' + Number(n || 0).toLocaleString('en-PH', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+  }
+
+  function daysBetween(a, b){
+    const ms = b.setHours(0,0,0,0) - a.setHours(0,0,0,0);
+    return Math.round(ms / 86400000);
+  }
+
+  function formatDate(dateStr){
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+  }
+
+  // Worst-status rule: any overdue unpaid entry -> red, else any unpaid entry -> yellow, else green.
+  function computeCustomerStatus(customer){
+    const entries = (customer.utang_entries || []).filter(e => Number(e.amount_remaining) > 0);
+    const total = entries.reduce((sum, e) => sum + Number(e.amount_remaining), 0);
+
+    if (entries.length === 0){
+      return {status: 'paid', subtext: 'No utang', total, sortDays: -Infinity};
+    }
+
+    const today = new Date();
+    const withDueDates = entries.filter(e => e.due_date);
+    const overdue = withDueDates
+      .filter(e => daysBetween(new Date(e.due_date + 'T00:00:00'), new Date()) > 0)
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+
+    if (overdue.length > 0){
+      const days = daysBetween(new Date(overdue[0].due_date + 'T00:00:00'), new Date());
+      return {status: 'overdue', subtext: `${days} day${days === 1 ? '' : 's'} overdue`, total, sortDays: days};
+    }
+
+    const upcoming = withDueDates.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+    if (upcoming.length > 0){
+      return {status: 'active', subtext: `Utang due ${formatDate(upcoming[0].due_date)}`, total, sortDays: 0};
+    }
+
+    return {status: 'active', subtext: 'Has active utang', total, sortDays: 0};
+  }
+
+  function sortCustomers(list, mode){
+    const withStatus = list.map(c => ({customer: c, info: computeCustomerStatus(c)}));
+    if (mode === 'owed'){
+      withStatus.sort((a, b) => b.info.total - a.info.total);
+    } else if (mode === 'overdue'){
+      withStatus.sort((a, b) => b.info.sortDays - a.info.sortDays);
+    } else {
+      withStatus.sort((a, b) => a.customer.name.localeCompare(b.customer.name));
+    }
+    return withStatus;
+  }
+
+  function renderCustomerList(containerId, list, emptyMessage){
+    const container = document.getElementById(containerId);
+    const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+    let filtered = list;
+    if (query && containerId === 'customerList'){
+      filtered = list.filter(c => c.name.toLowerCase().includes(query));
+    }
+
+    if (filtered.length === 0){
+      container.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+      return;
+    }
+
+    const sorted = containerId === 'customerList' ? sortCustomers(filtered, currentSort) : filtered.map(c => ({customer: c, info: computeCustomerStatus(c)}));
+
+    container.innerHTML = sorted.map(({customer, info}) => `
+      <div class="customer-card status-${info.status}" data-id="${customer.id}">
+        <div>
+          <div class="customer-name">${escapeHtml(customer.name)}</div>
+          <div class="customer-status">${info.subtext}</div>
+        </div>
+        <div class="customer-total">${peso(info.total)}</div>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderTotalUtang(){
+    const total = customers.reduce((sum, c) => sum + computeCustomerStatus(c).total, 0);
+    document.getElementById('totalUtang').textContent = peso(total);
+  }
+
+  function renderAll(){
+    renderTotalUtang();
+    renderCustomerList('customerList', customers, 'No customers yet. Add one below.');
+    renderCustomerList('archivedList', archivedCustomers, 'No archived customers.');
+  }
+
+  async function fetchCustomers(){
+    if (!supabaseReady){
+      customers = [];
+      archivedCustomers = [];
+      renderAll();
+      return;
+    }
+    const {data, error} = await supabase
+      .from('customers')
+      .select('*, utang_entries(*)')
+      .order('created_at', {ascending: true});
+
+    if (error){
+      showToast('Could not load customers');
+      console.error(error);
+      return;
+    }
+
+    customers = (data || []).filter(c => !c.archived);
+    archivedCustomers = (data || []).filter(c => c.archived);
+    renderAll();
+  }
+
+  async function addCustomer(name){
+    if (!name.trim()) return;
+    if (!supabaseReady){
+      showToast('Connect Supabase first (see README)');
+      return;
+    }
+    const {error} = await supabase.from('customers').insert({name: name.trim()});
+    if (error){
+      showToast('Could not add customer');
+      console.error(error);
+      return;
+    }
+    document.getElementById('newCustomerName').value = '';
+    document.getElementById('newCustomerForm').classList.add('hidden');
+    await fetchCustomers();
+    showToast('Customer added');
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.getElementById(tab === 'active' ? 'activePanel' : 'archivedPanel').classList.add('active');
+    });
+  });
+
+  document.getElementById('searchInput').addEventListener('input', () => {
+    renderCustomerList('customerList', customers, 'No customers yet. Add one below.');
+  });
+
+  document.getElementById('sortSelect').addEventListener('change', (e) => {
+    currentSort = e.target.value;
+    renderCustomerList('customerList', customers, 'No customers yet. Add one below.');
+  });
+
+  document.getElementById('newCustomerToggle').addEventListener('click', () => {
+    document.getElementById('newCustomerForm').classList.toggle('hidden');
+    document.getElementById('newCustomerName').focus();
+  });
+
+  document.getElementById('newCustomerSave').addEventListener('click', () => {
+    addCustomer(document.getElementById('newCustomerName').value);
+  });
+
+  document.getElementById('newCustomerName').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addCustomer(e.target.value);
+  });
+
+  document.getElementById('addUtangBtn').addEventListener('click', () => {
+    showToast('Add utang is coming in the next stage');
+  });
+
+  document.getElementById('addPaymentBtn').addEventListener('click', () => {
+    showToast('Add payment is coming in the next stage');
+  });
+
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    showToast('Settings screen is coming in a later stage');
+  });
+
+  if (!supabaseReady){
+    showToast('Add your Supabase URL and key in index.html (see README)');
+  }
+
+  fetchCustomers();
+</script>
+
+</body>
+</html>
