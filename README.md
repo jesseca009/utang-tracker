@@ -2,7 +2,7 @@
 
 A mobile-first web app for sari-sari store owners to track customer utang (informal credit), replacing the paper libreta.
 
-This is **stage 1**: the dashboard and the customer/utang/payment data model. Later stages (Add utang, Add payment, receipts, edit/delete, customer settings, monthly report) will build on top of this.
+This is **stage 2**: dashboard, customer data model, Add utang, Add payment, and receipts. Later stages (edit/delete with history, customer settings, monthly report) will build on top of this.
 
 ## Tech
 
@@ -24,5 +24,8 @@ Single static `index.html` (vanilla JS + the Supabase JS client via CDN), a Supa
 
 - Dashboard: total utang, customer list colored by status (red = overdue, yellow = has active utang, green = paid/no utang), search, sort (Most owed / Most overdue / Alphabetical), Archived tab.
 - "+ New customer" (name only — everything else can be set later).
+- **Add utang**: pick an existing customer or type a new name, itemized entry, optional due date, live "This entry" / "New total utang" totals. Warns (but doesn't block) if the customer already has an overdue entry. Blocks over the credit limit unless you tap "Add anyway". Store credit from a past overpayment is auto-applied and shown as a line item.
+- **Add payment**: pick a customer, enter an amount — it's applied FIFO to their oldest unpaid entry first. If the amount is more than what's owed, you must choose "gave change back" or "keep as store credit" before saving.
+- **Receipts**: after saving either flow, a receipt (store name, itemized/payment details, totals, colored status banners) renders on screen and downloads as a PNG via "Save receipt" — no external image library involved.
 
-"Add utang" and "Add payment" are visible on the dashboard but not wired up yet — they're the next stage.
+Settings, editing/deleting entries (with history), and the monthly report are the next stages.
