@@ -1,0 +1,2332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Utang Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#F7F6F2;
+    --card-bg:#FFFFFF;
+    --text:#2B2620;
+    --muted:#8A8378;
+    --border:#E8E4DB;
+    --accent:#3D6B4F;
+
+    /* status colors — exact values from spec, solid fills only */
+    --overdue-bg:#FF5A5A;
+    --overdue-text:#FFFFFF;
+    --active-bg:#FFC93C;
+    --active-text:#5C3D00;
+    --paid-bg:#3DDC84;
+    --paid-text:#0A3D1F;
+
+    --radius:14px;
+    --shadow:0 2px 10px rgba(43,38,32,0.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Poppins',sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+  }
+  h1,h2,h3,h4{margin:0 0 8px;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select{font-family:inherit;}
+  .hidden{display:none !important;}
+
+  .topbar{
+    background:var(--card-bg);
+    border-bottom:1px solid var(--border);
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .brand-name{font-weight:700;font-size:1.1rem;}
+  .settings-btn{
+    background:transparent;
+    border:none;
+    font-size:1.3rem;
+    padding:4px 8px;
+    line-height:1;
+    color:var(--muted);
+  }
+
+  .tabs{
+    display:flex;
+    gap:4px;
+    background:var(--card-bg);
+    padding:0 16px 10px;
+    border-bottom:1px solid var(--border);
+    position:sticky;
+    top:53px;
+    z-index:19;
+  }
+  .tab-btn{
+    background:transparent;
+    border:none;
+    padding:8px 14px;
+    border-radius:999px;
+    font-weight:600;
+    font-size:0.85rem;
+    color:var(--muted);
+  }
+  .tab-btn.active{background:var(--bg);color:var(--text);}
+
+  main{max-width:520px;margin:0 auto;padding:16px;padding-bottom:60px;}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .metric-card{
+    background:var(--card-bg);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:18px;
+    text-align:center;
+    margin-bottom:14px;
+  }
+  .metric-label{font-size:0.8rem;color:var(--muted);margin-bottom:4px;}
+  .metric-value{font-size:2rem;font-weight:700;}
+
+  .action-row{
+    display:flex;
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .btn-primary{
+    flex:1;
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:13px 12px;
+    border-radius:10px;
+    font-weight:600;
+    font-size:0.92rem;
+    box-shadow:var(--shadow);
+  }
+  .btn-primary:hover{filter:brightness(0.95);}
+  .btn-secondary{
+    background:var(--card-bg);
+    color:var(--text);
+    border:1px solid var(--border);
+    padding:10px 14px;
+    border-radius:10px;
+    font-weight:600;
+    font-size:0.85rem;
+  }
+  .btn-secondary:hover{background:var(--bg);}
+
+  .search-row{margin-bottom:10px;}
+  .search-input{
+    width:100%;
+    padding:11px 14px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    font-size:0.92rem;
+    background:var(--card-bg);
+  }
+
+  .sort-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+    gap:10px;
+  }
+  .sort-row label{font-size:0.8rem;color:var(--muted);}
+  .sort-select{
+    padding:7px 10px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    font-size:0.85rem;
+    background:var(--card-bg);
+  }
+
+  .customer-list{display:flex;flex-direction:column;gap:10px;}
+  .customer-card{
+    border-radius:var(--radius);
+    padding:14px 16px;
+    box-shadow:var(--shadow);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .customer-name{font-weight:700;font-size:1rem;}
+  .customer-status{font-size:0.8rem;opacity:0.9;margin-top:2px;}
+  .customer-total{font-weight:700;font-size:1.05rem;white-space:nowrap;}
+
+  .status-overdue{background:var(--overdue-bg);color:var(--overdue-text);}
+  .status-active{background:var(--active-bg);color:var(--active-text);}
+  .status-paid{background:var(--paid-bg);color:var(--paid-text);}
+
+  .empty-state{
+    text-align:center;
+    color:var(--muted);
+    padding:40px 20px;
+    font-size:0.9rem;
+  }
+
+  .new-customer-row{margin-top:16px;}
+  .new-customer-form{
+    background:var(--card-bg);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:14px;
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+  }
+  .new-customer-form input{
+    flex:1;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    font-size:0.9rem;
+  }
+  .new-customer-note{
+    font-size:0.75rem;
+    color:var(--muted);
+    margin-top:6px;
+  }
+
+  .toast{
+    position:fixed;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%);
+    background:var(--text);
+    color:#fff;
+    padding:11px 20px;
+    border-radius:999px;
+    font-size:0.85rem;
+    box-shadow:var(--shadow);
+    z-index:50;
+  }
+
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(43,38,32,0.45);
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:100;
+  }
+  .modal-sheet{
+    background:var(--card-bg);
+    width:100%;
+    max-width:520px;
+    max-height:92vh;
+    overflow-y:auto;
+    border-radius:18px 18px 0 0;
+    box-shadow:var(--shadow);
+  }
+  .modal-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:16px 18px 8px;
+    position:sticky;
+    top:0;
+    background:var(--card-bg);
+    z-index:1;
+  }
+  .modal-header h3{margin:0;}
+  .modal-close{
+    background:transparent;
+    border:none;
+    font-size:1.5rem;
+    color:var(--muted);
+    line-height:1;
+    padding:4px 8px;
+  }
+  .modal-body{padding:4px 18px 8px;}
+  .modal-actions{
+    padding:12px 18px 18px;
+    position:sticky;
+    bottom:0;
+    background:var(--card-bg);
+  }
+  .modal-actions .btn-primary:disabled{
+    opacity:0.5;
+    cursor:not-allowed;
+  }
+
+  .field-label{
+    display:block;
+    font-size:0.78rem;
+    color:var(--muted);
+    margin:14px 0 6px;
+    font-weight:600;
+  }
+  .form-input{
+    width:100%;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    font-size:0.92rem;
+  }
+
+  .customer-picker{position:relative;}
+  .picker-dropdown{
+    position:absolute;
+    left:0;right:0;
+    top:calc(100% + 4px);
+    background:var(--card-bg);
+    border:1px solid var(--border);
+    border-radius:10px;
+    box-shadow:var(--shadow);
+    max-height:180px;
+    overflow-y:auto;
+    z-index:10;
+  }
+  .picker-option{
+    padding:10px 12px;
+    font-size:0.88rem;
+    cursor:pointer;
+  }
+  .picker-option:hover{background:var(--bg);}
+  .picker-option.picker-new{color:var(--accent);font-weight:600;}
+  .picker-empty{padding:10px 12px;font-size:0.85rem;color:var(--muted);}
+
+  .selected-customer-line{
+    font-size:0.85rem;
+    color:var(--muted);
+    margin-top:6px;
+  }
+
+  .banner{
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:0.85rem;
+    font-weight:600;
+    margin:12px 0;
+  }
+  .banner-overdue, .banner-overlimit{background:var(--overdue-bg);color:var(--overdue-text);}
+  .banner-active{background:var(--active-bg);color:var(--active-text);}
+  .banner-paid{background:var(--paid-bg);color:var(--paid-text);}
+  .checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:8px;
+    font-weight:600;
+    font-size:0.85rem;
+  }
+
+  .store-credit-note{
+    font-size:0.82rem;
+    color:var(--accent);
+    font-weight:600;
+    margin:8px 0;
+  }
+
+  .item-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+    align-items:center;
+  }
+  .item-row input[type="text"]{flex:1.4;min-width:0;}
+  .item-row input[type="number"]{flex:1;min-width:0;}
+  .item-row input{
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    font-size:0.9rem;
+  }
+  .item-remove-btn{
+    background:transparent;
+    border:none;
+    color:var(--muted);
+    font-size:1.2rem;
+    padding:4px 8px;
+    line-height:1;
+    flex:none;
+  }
+
+  .totals-box{
+    background:var(--bg);
+    border-radius:10px;
+    padding:12px 14px;
+    margin-top:14px;
+  }
+  .totals-line{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.88rem;
+    padding:4px 0;
+  }
+  .totals-line-strong{font-weight:700;font-size:1rem;}
+
+  .radio-group{margin:10px 0;}
+  .radio-option{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 0;
+    font-size:0.88rem;
+  }
+
+  .receipt-body{display:flex;justify-content:center;}
+  .receipt-canvas{
+    width:100%;
+    max-width:400px;
+    height:auto;
+    border-radius:10px;
+    box-shadow:var(--shadow);
+  }
+
+  .report-topbar-btn{
+    background:transparent;
+    border:none;
+    font-size:1.15rem;
+    padding:4px 8px;
+    line-height:1;
+    color:var(--muted);
+  }
+
+  .detail-header{padding:20px 18px;align-items:flex-start;}
+  .detail-header .modal-close{color:inherit;}
+  .detail-header.status-overdue{background:var(--overdue-bg);color:var(--overdue-text);}
+  .detail-header.status-active{background:var(--active-bg);color:var(--active-text);}
+  .detail-header.status-paid{background:var(--paid-bg);color:var(--paid-text);}
+  .detail-header-name{font-size:1.3rem;font-weight:700;}
+  .detail-header-sub{font-size:0.88rem;margin-top:2px;opacity:0.9;}
+  .detail-header-total{font-size:1.8rem;font-weight:700;margin-top:10px;}
+
+  .detail-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    padding:14px 18px 4px;
+  }
+  .detail-actions .btn-primary, .detail-actions .btn-secondary{flex:1;min-width:120px;}
+  .btn-disabled{
+    flex:1;
+    min-width:120px;
+    background:var(--bg);
+    color:var(--muted);
+    border:1px solid var(--border);
+    padding:10px 14px;
+    border-radius:10px;
+    font-weight:600;
+    font-size:0.85rem;
+    cursor:not-allowed;
+  }
+
+  .detail-section{padding:16px 18px 4px;}
+  .detail-section h4{font-size:0.95rem;}
+
+  .entry-card{
+    border-radius:12px;
+    padding:12px 14px;
+    box-shadow:var(--shadow);
+    margin-bottom:10px;
+    border-left:6px solid var(--border);
+  }
+  .entry-card.status-overdue{border-left-color:var(--overdue-bg);background:var(--card-bg);color:var(--text);}
+  .entry-card.status-active{border-left-color:var(--active-bg);background:var(--card-bg);color:var(--text);}
+  .entry-card.status-paid{border-left-color:var(--paid-bg);background:var(--card-bg);color:var(--text);}
+  .entry-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .entry-items{font-size:0.88rem;}
+  .entry-items div{padding:1px 0;}
+  .entry-meta{font-size:0.78rem;color:var(--muted);margin-top:6px;}
+  .entry-pill{
+    font-size:0.72rem;
+    font-weight:700;
+    padding:3px 9px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .entry-edited-note{font-size:0.72rem;color:var(--muted);font-style:italic;margin-top:6px;}
+  .entry-actions{display:flex;gap:8px;margin-top:10px;}
+  .entry-actions button{
+    background:transparent;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:6px 12px;
+    font-size:0.78rem;
+    font-weight:600;
+    color:var(--text);
+  }
+  .entry-actions .entry-delete-btn{color:var(--overdue-bg);border-color:var(--overdue-bg);}
+
+  .timeline-list{display:flex;flex-direction:column;gap:8px;}
+  .timeline-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 12px;
+    border-radius:10px;
+    background:var(--bg);
+    font-size:0.85rem;
+  }
+  .timeline-label{display:flex;flex-direction:column;gap:2px;}
+  .timeline-date{font-size:0.72rem;color:var(--muted);}
+  .timeline-amount-positive{color:var(--overdue-bg);font-weight:700;white-space:nowrap;}
+  .timeline-amount-negative{color:var(--paid-text);font-weight:700;white-space:nowrap;}
+
+  .footer-note{
+    text-align:center;
+    font-size:0.78rem;
+    color:var(--muted);
+    padding:14px 18px 20px;
+  }
+
+  .report-stat{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .report-stat:last-child{border-bottom:none;}
+  .report-stat-label{font-size:0.9rem;color:var(--muted);}
+  .report-stat-value{font-size:1.2rem;font-weight:700;}
+
+  #authScreen a, #pinScreen a{color:var(--accent);font-weight:600;text-decoration:none;}
+  #authScreen a:hover, #pinScreen a:hover{text-decoration:underline;}
+
+  .pin-input{
+    text-align:center;
+    font-size:1.6rem;
+    letter-spacing:0.5em;
+    padding:12px;
+  }
+  .pin-error{color:var(--overdue-bg);font-size:0.82rem;margin-top:8px;font-weight:600;}
+
+  .confirm-message{font-size:0.92rem;margin:8px 0 18px;line-height:1.5;}
+  .confirm-actions{display:flex;gap:10px;}
+  .confirm-actions button{flex:1;}
+  .btn-danger{
+    background:var(--overdue-bg);
+    color:#fff;
+    border:none;
+    padding:13px 12px;
+    border-radius:10px;
+    font-weight:600;
+    font-size:0.92rem;
+  }
+</style>
+</head>
+<body>
+
+<div id="authScreen" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:380px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div class="brand-name" style="font-size:1.4rem;">Utang Tracker</div>
+    </div>
+
+    <div id="loginPanel">
+      <label class="field-label" for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" class="form-input" autocomplete="username">
+      <label class="field-label" for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" class="form-input" autocomplete="current-password">
+      <button class="btn-primary" id="loginBtn" style="width:100%;margin-top:16px;">Log in</button>
+      <div style="text-align:center;margin-top:14px;font-size:0.85rem;">
+        New here? <a href="#" id="showSignupLink">Create an account</a>
+      </div>
+    </div>
+
+    <div id="signupPanel" class="hidden">
+      <label class="field-label" for="signupEmail">Email</label>
+      <input type="email" id="signupEmail" class="form-input" autocomplete="username">
+      <label class="field-label" for="signupPassword">Password</label>
+      <input type="password" id="signupPassword" class="form-input" autocomplete="new-password">
+      <button class="btn-primary" id="signupBtn" style="width:100%;margin-top:16px;">Create account</button>
+      <div style="text-align:center;margin-top:14px;font-size:0.85rem;">
+        Already have an account? <a href="#" id="showLoginLink">Log in</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pinScreen" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:340px;text-align:center;">
+    <div class="brand-name" style="font-size:1.2rem;margin-bottom:6px;" id="pinScreenTitle">Enter your PIN</div>
+    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:20px;" id="pinScreenSubtitle">Quick unlock for this device</div>
+
+    <div id="pinEntryMode">
+      <input type="password" id="pinEntryInput" class="form-input pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••">
+      <div class="pin-error hidden" id="pinEntryError">Wrong PIN. Try again.</div>
+      <div style="margin-top:16px;font-size:0.85rem;">
+        <a href="#" id="pinForgotLink">Log in with email instead</a>
+      </div>
+    </div>
+
+    <div id="pinSetupMode" class="hidden">
+      <label class="field-label" for="pinSetupInput">Choose a 4-digit PIN</label>
+      <input type="password" id="pinSetupInput" class="form-input pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••">
+      <label class="field-label" for="pinConfirmInput">Confirm PIN</label>
+      <input type="password" id="pinConfirmInput" class="form-input pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••">
+      <div class="pin-error hidden" id="pinSetupError">PINs don't match.</div>
+      <button class="btn-primary" id="pinSetupBtn" style="width:100%;margin-top:12px;">Set PIN</button>
+      <div class="hidden" id="pinSetupCancelRow" style="margin-top:14px;font-size:0.85rem;">
+        <a href="#" id="pinSetupCancelLink">Cancel</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="storeNameScreen" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:380px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div class="brand-name" style="font-size:1.25rem;">What's your store name?</div>
+    </div>
+    <input type="text" id="onboardStoreNameInput" class="form-input" placeholder="Input here">
+    <button class="btn-primary" id="storeNameContinueBtn" style="width:100%;margin-top:16px;">Continue</button>
+  </div>
+</div>
+
+<div id="welcomeScreen" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:380px;text-align:center;">
+    <div class="brand-name" style="font-size:1.4rem;" id="welcomeMessage">You're all set!</div>
+    <div style="font-size:0.9rem;color:var(--muted);margin-top:12px;line-height:1.5;">Tap "Add utang" to log your first customer.</div>
+    <button class="btn-primary" id="welcomeContinueBtn" style="width:100%;margin-top:24px;">Go to dashboard</button>
+  </div>
+</div>
+
+<div id="appShell" class="hidden">
+<div class="topbar">
+  <div class="brand-name" id="storeNameLabel">My Store</div>
+  <div style="display:flex;align-items:center;">
+    <button class="report-topbar-btn" id="reportBtn" title="Monthly report">&#128202;</button>
+    <button class="settings-btn" id="settingsBtn" title="Settings">&#9881;</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="active">Customers</button>
+  <button class="tab-btn" data-tab="archived">Archived</button>
+</div>
+
+<main>
+
+  <div id="activePanel" class="tab-panel active">
+    <div class="metric-card">
+      <div class="metric-label">Total utang</div>
+      <div class="metric-value" id="totalUtang">&#8369;0</div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn-primary" id="addUtangBtn">Add utang</button>
+      <button class="btn-primary" id="addPaymentBtn">Add payment</button>
+    </div>
+
+    <div class="search-row">
+      <input type="text" class="search-input" id="searchInput" placeholder="Search customers">
+    </div>
+
+    <div class="sort-row">
+      <label for="sortSelect">Sort</label>
+      <select class="sort-select" id="sortSelect">
+        <option value="owed">Most owed</option>
+        <option value="overdue">Most overdue</option>
+        <option value="alpha">Alphabetical</option>
+      </select>
+    </div>
+
+    <div class="customer-list" id="customerList"></div>
+
+    <div class="new-customer-row">
+      <button class="btn-secondary" id="newCustomerToggle">+ New customer</button>
+      <div class="new-customer-form hidden" id="newCustomerForm">
+        <input type="text" id="newCustomerName" placeholder="Customer name">
+        <button class="btn-primary" id="newCustomerSave" style="flex:none;">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="archivedPanel" class="tab-panel">
+    <div class="customer-list" id="archivedList"></div>
+  </div>
+
+</main>
+</div>
+
+<div class="modal-overlay hidden" id="addUtangModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3>Add utang</h3>
+      <button class="modal-close" id="utangCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label" for="utangCustomerInput">Customer</label>
+      <div class="customer-picker">
+        <input type="text" id="utangCustomerInput" class="form-input" placeholder="Search or type a new name" autocomplete="off">
+        <div class="picker-dropdown hidden" id="utangCustomerDropdown"></div>
+      </div>
+      <div class="selected-customer-line hidden" id="utangSelectedLine"></div>
+
+      <div id="utangOverdueBanner" class="banner banner-overdue hidden"></div>
+      <div id="utangOverLimitBanner" class="banner banner-overlimit hidden">
+        <div id="utangOverLimitText"></div>
+        <label class="checkbox-row"><input type="checkbox" id="utangAddAnyway"> Add anyway</label>
+      </div>
+      <div id="utangStoreCreditNote" class="store-credit-note hidden"></div>
+
+      <label class="field-label">Items</label>
+      <div id="utangItemRows"></div>
+      <button class="btn-secondary" id="utangAddItemBtn" type="button">+ Add item</button>
+
+      <label class="field-label" for="utangDueDate">Due date (optional)</label>
+      <input type="date" id="utangDueDate" class="form-input">
+
+      <div class="totals-box">
+        <div class="totals-line"><span>This entry</span><span id="utangThisEntryTotal">₱ 0</span></div>
+        <div class="totals-line totals-line-strong"><span>New total utang</span><span id="utangNewTotal">₱ 0</span></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="utangSaveBtn">Save utang</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="addPaymentModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3>Add payment</h3>
+      <button class="modal-close" id="paymentCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label" for="paymentCustomerInput">Customer</label>
+      <div class="customer-picker">
+        <input type="text" id="paymentCustomerInput" class="form-input" placeholder="Search customer" autocomplete="off">
+        <div class="picker-dropdown hidden" id="paymentCustomerDropdown"></div>
+      </div>
+      <div class="selected-customer-line hidden" id="paymentCurrentTotalLine"></div>
+
+      <label class="field-label" for="paymentAmount">Amount paid</label>
+      <input type="number" id="paymentAmount" class="form-input" placeholder="0" min="0" step="0.01">
+
+      <div id="paymentOverpaidBanner" class="banner banner-overdue hidden">
+        <div id="paymentOverpaidText"></div>
+        <div class="radio-group">
+          <label class="radio-option"><input type="radio" name="overpaymentAction" value="change_given"> Gave change back to customer</label>
+          <label class="radio-option"><input type="radio" name="overpaymentAction" value="store_credit"> Keep as store credit for next utang</label>
+        </div>
+      </div>
+
+      <div class="totals-box">
+        <div class="totals-line totals-line-strong"><span>Remaining balance</span><span id="paymentRemainingTotal">₱ 0</span></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="paymentSaveBtn">Save payment</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="customerDetailModal">
+  <div class="modal-sheet">
+    <div class="modal-header detail-header status-paid" id="detailHeader">
+      <div>
+        <div class="detail-header-name" id="detailName"></div>
+        <div class="detail-header-sub" id="detailSub"></div>
+        <div class="detail-header-total" id="detailTotal"></div>
+      </div>
+      <button class="modal-close" id="detailCloseBtn">&times;</button>
+    </div>
+
+    <div class="detail-actions">
+      <button class="btn-primary" id="detailAddUtangBtn">Add utang</button>
+      <button class="btn-primary" id="detailAddPaymentBtn">Add payment</button>
+      <button class="btn-secondary" id="detailSettingsBtn">Settings</button>
+      <button class="btn-disabled" disabled title="Coming in a later stage">Send summary</button>
+      <button class="btn-disabled" disabled title="Coming in a later stage">Reminder</button>
+    </div>
+
+    <div class="detail-section">
+      <h4>Entries</h4>
+      <div id="detailEntries"></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Payment history</h4>
+      <div class="timeline-list" id="detailTimeline"></div>
+    </div>
+
+    <div class="footer-note">Payments apply to the oldest entry first</div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="editEntryModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3>Edit utang entry</h3>
+      <button class="modal-close" id="editEntryCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">Items</label>
+      <div id="editEntryItemRows"></div>
+      <button class="btn-secondary" id="editEntryAddItemBtn" type="button">+ Add item</button>
+
+      <label class="field-label" for="editEntryDueDate">Due date (optional)</label>
+      <input type="date" id="editEntryDueDate" class="form-input">
+
+      <div class="totals-box">
+        <div class="totals-line totals-line-strong"><span>New total</span><span id="editEntryTotal">₱ 0</span></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="editEntrySaveBtn">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="customerSettingsModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3>Customer settings</h3>
+      <button class="modal-close" id="settingsCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label" for="settingsPaymentTerm">Payment term</label>
+      <select id="settingsPaymentTerm" class="form-input">
+        <option value="No fixed date">No fixed date</option>
+        <option value="Custom per entry">Custom due date each entry</option>
+        <option value="Payday">Payday</option>
+        <option value="Weekly">Weekly</option>
+      </select>
+
+      <label class="field-label" for="settingsCreditLimit">Credit limit (optional)</label>
+      <input type="number" id="settingsCreditLimit" class="form-input" min="0" step="0.01" placeholder="No limit">
+
+      <label class="field-label">If overdue</label>
+      <div class="radio-group">
+        <label class="radio-option"><input type="radio" name="overdueBehavior" value="warn"> Warn me, let me decide</label>
+        <label class="radio-option"><input type="radio" name="overdueBehavior" value="block"> Block new utang until they pay</label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="settingsSaveBtn">Save settings</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="reportModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3>Monthly report</h3>
+      <button class="modal-close" id="reportCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="report-stat"><span class="report-stat-label">Total utang given this month</span><span class="report-stat-value" id="reportGiven">₱ 0</span></div>
+      <div class="report-stat"><span class="report-stat-label">Total collected this month</span><span class="report-stat-value" id="reportCollected">₱ 0</span></div>
+      <div class="report-stat"><span class="report-stat-label">Net change</span><span class="report-stat-value" id="reportNet">₱ 0</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="globalSettingsModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3>Settings</h3>
+      <button class="modal-close" id="globalSettingsCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label" for="globalStoreName">Store name</label>
+      <input type="text" id="globalStoreName" class="form-input">
+      <button class="btn-primary" id="globalStoreNameSaveBtn" style="width:100%;margin-top:10px;">Save store name</button>
+
+      <label class="field-label" style="margin-top:24px;">Security</label>
+      <button class="btn-secondary" id="changePinBtn" style="width:100%;">Change PIN</button>
+      <button class="btn-danger" id="logoutBtn" style="width:100%;margin-top:10px;">Log out</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="confirmModal">
+  <div class="modal-sheet" style="border-radius:18px;max-width:400px;">
+    <div class="modal-body" style="padding-top:20px;">
+      <div class="confirm-message" id="confirmMessage"></div>
+      <div class="confirm-actions">
+        <button class="btn-secondary" id="confirmCancelBtn">Cancel</button>
+        <button class="btn-danger" id="confirmOkBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="receiptModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3 id="receiptTitle">Receipt</h3>
+      <button class="modal-close" id="receiptCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body receipt-body">
+      <canvas id="receiptCanvas" class="receipt-canvas"></canvas>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="receiptSaveBtn">Save receipt</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // --- Fill these in from your Supabase project (Project Settings > API) ---
+  const SUPABASE_URL = 'https://uoetrucrflldxmpcrpag.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_hpmnluGoHzFK0A5wA8oz6Q_ZFWNYpB9';
+
+  const credentialsFilled = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+  // window.supabase comes from the CDN <script> tag above — guard against it not
+  // having loaded yet (slow connection, ad-blocker, offline) so a network hiccup
+  // degrades to a toast instead of a silent, permanently blank page.
+  const cdnLoaded = typeof window.supabase !== 'undefined';
+  const supabaseReady = credentialsFilled && cdnLoaded;
+  const supabaseClient = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+  let STORE_NAME = 'My Store';
+  document.getElementById('storeNameLabel').textContent = STORE_NAME;
+
+  let customers = [];
+  let archivedCustomers = [];
+  let currentSort = 'owed';
+
+  function showToast(msg){
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2200);
+  }
+
+  function peso(n){
+    return '₱ ' + Number(n || 0).toLocaleString('en-PH', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+  }
+
+  function daysBetween(a, b){
+    const ms = b.setHours(0,0,0,0) - a.setHours(0,0,0,0);
+    return Math.round(ms / 86400000);
+  }
+
+  function formatDate(dateStr){
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+  }
+
+  // Worst-status rule: any overdue unpaid entry -> red, else any unpaid entry -> yellow, else green.
+  function computeCustomerStatus(customer){
+    const entries = (customer.utang_entries || []).filter(e => Number(e.amount_remaining) > 0);
+    const total = entries.reduce((sum, e) => sum + Number(e.amount_remaining), 0);
+
+    if (entries.length === 0){
+      return {status: 'paid', subtext: 'No utang', total, sortDays: -Infinity};
+    }
+
+    const today = new Date();
+    const withDueDates = entries.filter(e => e.due_date);
+    const overdue = withDueDates
+      .filter(e => daysBetween(new Date(e.due_date + 'T00:00:00'), new Date()) > 0)
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+
+    if (overdue.length > 0){
+      const days = daysBetween(new Date(overdue[0].due_date + 'T00:00:00'), new Date());
+      return {status: 'overdue', subtext: `${days} day${days === 1 ? '' : 's'} overdue`, total, sortDays: days};
+    }
+
+    const upcoming = withDueDates.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+    if (upcoming.length > 0){
+      return {status: 'active', subtext: `Utang due ${formatDate(upcoming[0].due_date)}`, total, sortDays: 0};
+    }
+
+    return {status: 'active', subtext: 'Has active utang', total, sortDays: 0};
+  }
+
+  function sortCustomers(list, mode){
+    const withStatus = list.map(c => ({customer: c, info: computeCustomerStatus(c)}));
+    if (mode === 'owed'){
+      withStatus.sort((a, b) => b.info.total - a.info.total);
+    } else if (mode === 'overdue'){
+      withStatus.sort((a, b) => b.info.sortDays - a.info.sortDays);
+    } else {
+      withStatus.sort((a, b) => a.customer.name.localeCompare(b.customer.name));
+    }
+    return withStatus;
+  }
+
+  function renderCustomerList(containerId, list, emptyMessage){
+    const container = document.getElementById(containerId);
+    const query = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+    let filtered = list;
+    if (query && containerId === 'customerList'){
+      filtered = list.filter(c => c.name.toLowerCase().includes(query));
+    }
+
+    if (filtered.length === 0){
+      container.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
+      return;
+    }
+
+    const sorted = containerId === 'customerList' ? sortCustomers(filtered, currentSort) : filtered.map(c => ({customer: c, info: computeCustomerStatus(c)}));
+
+    container.innerHTML = sorted.map(({customer, info}) => `
+      <div class="customer-card status-${info.status}" data-id="${customer.id}">
+        <div>
+          <div class="customer-name">${escapeHtml(customer.name)}</div>
+          <div class="customer-status">${info.subtext}</div>
+        </div>
+        <div class="customer-total">${peso(info.total)}</div>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderTotalUtang(){
+    const total = customers.reduce((sum, c) => sum + computeCustomerStatus(c).total, 0);
+    document.getElementById('totalUtang').textContent = peso(total);
+  }
+
+  function renderAll(){
+    renderTotalUtang();
+    renderCustomerList('customerList', customers, 'No customers yet. Add one below.');
+    renderCustomerList('archivedList', archivedCustomers, 'No archived customers.');
+  }
+
+  async function fetchCustomers(){
+    if (!supabaseReady){
+      customers = [];
+      archivedCustomers = [];
+      renderAll();
+      return;
+    }
+    const {data, error} = await supabaseClient
+      .from('customers')
+      .select('*, utang_entries(*), payments(*)')
+      .order('created_at', {ascending: true});
+
+    if (error){
+      showToast('Could not load customers');
+      console.error(error);
+      return;
+    }
+
+    customers = (data || []).filter(c => !c.archived);
+    archivedCustomers = (data || []).filter(c => c.archived);
+    renderAll();
+  }
+
+  async function addCustomer(name){
+    if (!name.trim()) return;
+    if (!supabaseReady){
+      showToast('Connect Supabase first (see README)');
+      return;
+    }
+    const {error} = await supabaseClient.from('customers').insert({name: name.trim()});
+    if (error){
+      showToast('Could not add customer');
+      console.error(error);
+      return;
+    }
+    document.getElementById('newCustomerName').value = '';
+    document.getElementById('newCustomerForm').classList.add('hidden');
+    await fetchCustomers();
+    showToast('Customer added');
+  }
+
+  // --- Stage 2: shared pure helpers ---
+
+  function round2(n){
+    return Math.round((Number(n || 0) + Number.EPSILON) * 100) / 100;
+  }
+
+  function todayISO(){
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function slug(str){
+    return (str || 'customer').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  }
+
+  // FIFO order: oldest incurred debt first.
+  function getUnpaidEntriesOldestFirst(customer){
+    return (customer?.utang_entries || [])
+      .filter(e => Number(e.amount_remaining) > 0)
+      .slice()
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  }
+
+  // Pure allocation function — used for both the live preview and the actual save.
+  function simulateAllocation(entriesOldestFirst, amountPaid){
+    let remaining = round2(amountPaid);
+    const allocations = [];
+    for (const entry of entriesOldestFirst){
+      if (remaining <= 0) break;
+      const owed = round2(entry.amount_remaining);
+      const applied = round2(Math.min(owed, remaining));
+      if (applied > 0){
+        allocations.push({entry, appliedAmount: applied});
+        remaining = round2(remaining - applied);
+      }
+    }
+    return {allocations, leftover: Math.max(0, round2(remaining))};
+  }
+
+  function computeNewEntryTotals(customer, itemsTotal){
+    const existingUnpaidTotal = getUnpaidEntriesOldestFirst(customer).reduce((sum, e) => sum + Number(e.amount_remaining), 0);
+    const storeCreditAvailable = Number(customer?.store_credit_balance || 0);
+    const storeCreditApplied = round2(Math.min(storeCreditAvailable, itemsTotal));
+    const amountRemaining = round2(itemsTotal - storeCreditApplied);
+    const newTotalUtang = round2(existingUnpaidTotal + amountRemaining);
+    return {existingUnpaidTotal: round2(existingUnpaidTotal), storeCreditApplied, amountRemaining, newTotalUtang};
+  }
+
+  function checkCreditLimit(customer, prospectiveTotal){
+    const limit = customer?.credit_limit;
+    if (limit === null || limit === undefined || limit === '') return {exceeds: false, limit: null};
+    return {exceeds: prospectiveTotal > Number(limit), limit: Number(limit)};
+  }
+
+  // Applies an allocation to a cloned customer so we can reuse computeCustomerStatus
+  // for the "remaining balance / still overdue?" wording on the payment receipt.
+  function applyAllocationToCustomer(customer, allocations){
+    const appliedByEntryId = new Map(allocations.map(a => [a.entry.id, a.appliedAmount]));
+    return {
+      ...customer,
+      utang_entries: (customer.utang_entries || []).map(e => {
+        const applied = appliedByEntryId.get(e.id);
+        return applied ? {...e, amount_remaining: round2(e.amount_remaining - applied)} : e;
+      })
+    };
+  }
+
+  // --- Modal open/close helpers ---
+
+  function openModal(id){ document.getElementById(id).classList.remove('hidden'); }
+  function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
+
+  // --- Customer picker (shared by Add utang + Add payment) ---
+
+  function renderCustomerDropdown(dropdownEl, query, list, {allowNew}){
+    const q = query.trim().toLowerCase();
+    const matches = q ? list.filter(c => c.name.toLowerCase().includes(q)) : list;
+    let html = matches.slice(0, 8).map(c => `<div class="picker-option" data-id="${c.id}">${escapeHtml(c.name)}</div>`).join('');
+    const exactMatch = list.some(c => c.name.toLowerCase() === q);
+    if (allowNew && q && !exactMatch){
+      html += `<div class="picker-option picker-new" data-new="${escapeHtml(query.trim())}">+ Add "${escapeHtml(query.trim())}" as new customer</div>`;
+    }
+    if (!html){
+      html = `<div class="picker-empty">No matching customers</div>`;
+    }
+    dropdownEl.innerHTML = html;
+    dropdownEl.classList.remove('hidden');
+  }
+
+  // --- Add utang modal ---
+
+  let utangSelectedCustomer = null;
+  let utangNewCustomerName = null;
+  let utangItems = [{name: '', amount: ''}];
+  let utangAddAnywayChecked = false;
+
+  function utangCustomerForCalc(){
+    return utangSelectedCustomer || {utang_entries: [], store_credit_balance: 0, credit_limit: null};
+  }
+
+  function resetUtangModal(){
+    utangSelectedCustomer = null;
+    utangNewCustomerName = null;
+    utangItems = [{name: '', amount: ''}];
+    utangAddAnywayChecked = false;
+    document.getElementById('utangCustomerInput').value = '';
+    document.getElementById('utangDueDate').value = '';
+    document.getElementById('utangCustomerDropdown').classList.add('hidden');
+    document.getElementById('utangSelectedLine').classList.add('hidden');
+    renderUtangItemRows();
+    renderUtangModal();
+  }
+
+  function renderUtangItemRows(){
+    const container = document.getElementById('utangItemRows');
+    container.innerHTML = utangItems.map((item, i) => `
+      <div class="item-row" data-index="${i}">
+        <input type="text" class="utang-item-name" placeholder="Item name" value="${escapeHtml(item.name)}">
+        <input type="number" class="utang-item-amount" placeholder="Amount" min="0" step="0.01" value="${item.amount}">
+        <button type="button" class="item-remove-btn" data-remove="${i}">&times;</button>
+      </div>
+    `).join('');
+  }
+
+  function utangItemsTotal(){
+    return round2(utangItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
+  }
+
+  function renderUtangModal(){
+    const customer = utangCustomerForCalc();
+    const itemsTotal = utangItemsTotal();
+    const totals = computeNewEntryTotals(customer, itemsTotal);
+    const creditCheck = checkCreditLimit(customer, totals.newTotalUtang);
+    const overdueInfo = utangSelectedCustomer ? computeCustomerStatus(utangSelectedCustomer) : null;
+
+    const isBlockedByOverdue = !!(overdueInfo && overdueInfo.status === 'overdue' && utangSelectedCustomer?.overdue_behavior === 'block');
+
+    const overdueBanner = document.getElementById('utangOverdueBanner');
+    if (overdueInfo && overdueInfo.status === 'overdue'){
+      overdueBanner.textContent = isBlockedByOverdue
+        ? `New utang is blocked until ${utangSelectedCustomer.name} pays — ${peso(overdueInfo.total)} overdue (${overdueInfo.subtext})`
+        : `${peso(overdueInfo.total)} already overdue — ${overdueInfo.subtext}`;
+      overdueBanner.classList.remove('hidden');
+    } else {
+      overdueBanner.classList.add('hidden');
+    }
+
+    const overLimitBanner = document.getElementById('utangOverLimitBanner');
+    if (creditCheck.exceeds){
+      document.getElementById('utangOverLimitText').textContent =
+        `This would bring total utang to ${peso(totals.newTotalUtang)}, over the ${peso(creditCheck.limit)} credit limit.`;
+      overLimitBanner.classList.remove('hidden');
+    } else {
+      overLimitBanner.classList.add('hidden');
+      utangAddAnywayChecked = false;
+      document.getElementById('utangAddAnyway').checked = false;
+    }
+
+    const creditNote = document.getElementById('utangStoreCreditNote');
+    if (totals.storeCreditApplied > 0){
+      creditNote.textContent = `Store credit applied: -${peso(totals.storeCreditApplied)}`;
+      creditNote.classList.remove('hidden');
+    } else {
+      creditNote.classList.add('hidden');
+    }
+
+    document.getElementById('utangThisEntryTotal').textContent = peso(itemsTotal);
+    document.getElementById('utangNewTotal').textContent = peso(totals.newTotalUtang);
+
+    const hasCustomer = !!(utangSelectedCustomer || utangNewCustomerName);
+    const hasValidItem = utangItems.some(item => item.name.trim() && Number(item.amount) > 0);
+    const blockedByLimit = creditCheck.exceeds && !utangAddAnywayChecked;
+    document.getElementById('utangSaveBtn').disabled = !hasCustomer || !hasValidItem || blockedByLimit || isBlockedByOverdue;
+  }
+
+  document.getElementById('addUtangBtn').addEventListener('click', () => {
+    resetUtangModal();
+    openModal('addUtangModal');
+  });
+  document.getElementById('utangCloseBtn').addEventListener('click', () => closeModal('addUtangModal'));
+
+  document.getElementById('utangCustomerInput').addEventListener('input', (e) => {
+    utangSelectedCustomer = null;
+    utangNewCustomerName = null;
+    document.getElementById('utangSelectedLine').classList.add('hidden');
+    renderCustomerDropdown(document.getElementById('utangCustomerDropdown'), e.target.value, customers, {allowNew: true});
+    renderUtangModal();
+  });
+  document.getElementById('utangCustomerInput').addEventListener('focus', (e) => {
+    renderCustomerDropdown(document.getElementById('utangCustomerDropdown'), e.target.value, customers, {allowNew: true});
+  });
+  document.getElementById('utangCustomerDropdown').addEventListener('click', (e) => {
+    const option = e.target.closest('.picker-option');
+    if (!option) return;
+    const line = document.getElementById('utangSelectedLine');
+    if (option.dataset.new !== undefined){
+      utangSelectedCustomer = null;
+      utangNewCustomerName = option.dataset.new;
+      document.getElementById('utangCustomerInput').value = utangNewCustomerName;
+      line.textContent = 'New customer — no utang yet';
+    } else {
+      utangSelectedCustomer = customers.find(c => c.id === option.dataset.id) || null;
+      utangNewCustomerName = null;
+      document.getElementById('utangCustomerInput').value = utangSelectedCustomer?.name || '';
+      const info = utangSelectedCustomer ? computeCustomerStatus(utangSelectedCustomer) : null;
+      line.textContent = info ? `Current: ${info.subtext} (${peso(info.total)})` : '';
+    }
+    line.classList.remove('hidden');
+    document.getElementById('utangCustomerDropdown').classList.add('hidden');
+    renderUtangModal();
+  });
+
+  document.getElementById('utangItemRows').addEventListener('input', (e) => {
+    const row = e.target.closest('.item-row');
+    if (!row) return;
+    const i = Number(row.dataset.index);
+    if (e.target.classList.contains('utang-item-name')) utangItems[i].name = e.target.value;
+    if (e.target.classList.contains('utang-item-amount')) utangItems[i].amount = e.target.value;
+    renderUtangModal();
+  });
+  document.getElementById('utangItemRows').addEventListener('click', (e) => {
+    if (e.target.dataset.remove === undefined) return;
+    const i = Number(e.target.dataset.remove);
+    if (utangItems.length > 1) utangItems.splice(i, 1);
+    else utangItems[0] = {name: '', amount: ''};
+    renderUtangItemRows();
+    renderUtangModal();
+  });
+  document.getElementById('utangAddItemBtn').addEventListener('click', () => {
+    utangItems.push({name: '', amount: ''});
+    renderUtangItemRows();
+    renderUtangModal();
+  });
+  document.getElementById('utangDueDate').addEventListener('change', renderUtangModal);
+  document.getElementById('utangAddAnyway').addEventListener('change', (e) => {
+    utangAddAnywayChecked = e.target.checked;
+    renderUtangModal();
+  });
+
+  document.getElementById('utangSaveBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+
+    const preSaveOverdueInfo = utangSelectedCustomer ? computeCustomerStatus(utangSelectedCustomer) : null;
+    const itemsTotal = utangItemsTotal();
+    const validItems = utangItems.filter(item => item.name.trim() && Number(item.amount) > 0)
+      .map(item => ({name: item.name.trim(), amount: round2(item.amount)}));
+    const dueDate = document.getElementById('utangDueDate').value || null;
+
+    let customerId = utangSelectedCustomer?.id;
+    let customerName = utangSelectedCustomer?.name;
+    let customerForCalc = utangCustomerForCalc();
+
+    if (!customerId){
+      customerName = utangNewCustomerName;
+      const {data, error} = await supabaseClient.from('customers').insert({name: customerName}).select().single();
+      if (error){ showToast('Could not create customer'); console.error(error); return; }
+      customerId = data.id;
+      customerForCalc = data;
+    }
+
+    const totals = computeNewEntryTotals(customerForCalc, itemsTotal);
+
+    const {error: entryError} = await supabaseClient.from('utang_entries').insert({
+      customer_id: customerId,
+      items: validItems,
+      total_amount: itemsTotal,
+      due_date: dueDate,
+      amount_remaining: totals.amountRemaining,
+      edited_history: []
+    });
+    if (entryError){ showToast('Could not save utang'); console.error(entryError); return; }
+
+    if (totals.storeCreditApplied > 0){
+      await supabaseClient.from('customers').update({
+        store_credit_balance: round2((customerForCalc.store_credit_balance || 0) - totals.storeCreditApplied)
+      }).eq('id', customerId);
+    }
+
+    closeModal('addUtangModal');
+    await fetchCustomers();
+
+    renderReceiptModal({
+      modalTitle: 'Utang receipt',
+      storeName: STORE_NAME,
+      customerName,
+      dateLabel: formatDate(todayISO()),
+      rows: validItems.map(item => ({label: item.name, value: peso(item.amount)})),
+      subtotalLabel: 'This entry',
+      subtotalValue: peso(itemsTotal),
+      totalLabel: 'Total utang',
+      totalValue: peso(totals.newTotalUtang),
+      banners: [
+        ...(preSaveOverdueInfo && preSaveOverdueInfo.status === 'overdue'
+          ? [{status: 'overdue', text: `${peso(preSaveOverdueInfo.total)} already overdue — ${preSaveOverdueInfo.subtext}`}]
+          : []),
+        ...(dueDate ? [{status: 'active', text: `This entry due ${formatDate(dueDate)}`}] : [])
+      ]
+    });
+  });
+
+  // --- Add payment modal ---
+
+  let paymentSelectedCustomer = null;
+  let paymentOverpaymentAction = null;
+
+  function resetPaymentModal(){
+    paymentSelectedCustomer = null;
+    paymentOverpaymentAction = null;
+    document.getElementById('paymentCustomerInput').value = '';
+    document.getElementById('paymentAmount').value = '';
+    document.getElementById('paymentCustomerDropdown').classList.add('hidden');
+    document.getElementById('paymentCurrentTotalLine').classList.add('hidden');
+    document.querySelectorAll('input[name="overpaymentAction"]').forEach(r => r.checked = false);
+    renderPaymentModal();
+  }
+
+  function renderPaymentModal(){
+    const amountPaid = round2(document.getElementById('paymentAmount').value || 0);
+    const banner = document.getElementById('paymentOverpaidBanner');
+    let leftover = 0;
+
+    if (paymentSelectedCustomer){
+      const entries = getUnpaidEntriesOldestFirst(paymentSelectedCustomer);
+      const {allocations, leftover: lo} = simulateAllocation(entries, amountPaid);
+      leftover = lo;
+      const updatedCustomer = applyAllocationToCustomer(paymentSelectedCustomer, allocations);
+      const remaining = computeCustomerStatus(updatedCustomer).total;
+      document.getElementById('paymentRemainingTotal').textContent = peso(remaining);
+    } else {
+      document.getElementById('paymentRemainingTotal').textContent = peso(0);
+    }
+
+    if (leftover > 0){
+      document.getElementById('paymentOverpaidText').textContent = `This is ${peso(leftover)} more than the utang`;
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+      paymentOverpaymentAction = null;
+      document.querySelectorAll('input[name="overpaymentAction"]').forEach(r => r.checked = false);
+    }
+
+    const blockedByOverpayment = leftover > 0 && !paymentOverpaymentAction;
+    document.getElementById('paymentSaveBtn').disabled = !paymentSelectedCustomer || amountPaid <= 0 || blockedByOverpayment;
+  }
+
+  document.getElementById('addPaymentBtn').addEventListener('click', () => {
+    resetPaymentModal();
+    openModal('addPaymentModal');
+  });
+  document.getElementById('paymentCloseBtn').addEventListener('click', () => closeModal('addPaymentModal'));
+
+  document.getElementById('paymentCustomerInput').addEventListener('input', (e) => {
+    paymentSelectedCustomer = null;
+    document.getElementById('paymentCurrentTotalLine').classList.add('hidden');
+    renderCustomerDropdown(document.getElementById('paymentCustomerDropdown'), e.target.value, customers, {allowNew: false});
+    renderPaymentModal();
+  });
+  document.getElementById('paymentCustomerInput').addEventListener('focus', (e) => {
+    renderCustomerDropdown(document.getElementById('paymentCustomerDropdown'), e.target.value, customers, {allowNew: false});
+  });
+  document.getElementById('paymentCustomerDropdown').addEventListener('click', (e) => {
+    const option = e.target.closest('.picker-option');
+    if (!option || option.dataset.id === undefined) return;
+    paymentSelectedCustomer = customers.find(c => c.id === option.dataset.id) || null;
+    document.getElementById('paymentCustomerInput').value = paymentSelectedCustomer?.name || '';
+    const info = paymentSelectedCustomer ? computeCustomerStatus(paymentSelectedCustomer) : null;
+    const line = document.getElementById('paymentCurrentTotalLine');
+    line.textContent = info ? `Current total utang: ${peso(info.total)}` : '';
+    line.classList.remove('hidden');
+    document.getElementById('paymentCustomerDropdown').classList.add('hidden');
+    renderPaymentModal();
+  });
+
+  document.getElementById('paymentAmount').addEventListener('input', renderPaymentModal);
+  document.querySelectorAll('input[name="overpaymentAction"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      paymentOverpaymentAction = e.target.value;
+      renderPaymentModal();
+    });
+  });
+
+  document.getElementById('paymentSaveBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    if (!paymentSelectedCustomer) return;
+
+    const customer = paymentSelectedCustomer;
+    const amountPaid = round2(document.getElementById('paymentAmount').value || 0);
+    const entries = getUnpaidEntriesOldestFirst(customer);
+    const {allocations, leftover} = simulateAllocation(entries, amountPaid);
+
+    for (const {entry, appliedAmount} of allocations){
+      const newRemaining = round2(entry.amount_remaining - appliedAmount);
+      const {error: updateError} = await supabaseClient.from('utang_entries')
+        .update({amount_remaining: newRemaining}).eq('id', entry.id);
+      if (updateError){ showToast('Could not update utang entry'); console.error(updateError); return; }
+
+      const {error: payError} = await supabaseClient.from('payments').insert({
+        customer_id: customer.id,
+        utang_entry_id: entry.id,
+        amount: appliedAmount,
+        date: todayISO()
+      });
+      if (payError){ showToast('Could not record payment'); console.error(payError); return; }
+    }
+
+    if (leftover > 0){
+      const {error: overError} = await supabaseClient.from('payments').insert({
+        customer_id: customer.id,
+        utang_entry_id: null,
+        amount: leftover,
+        date: todayISO(),
+        overpayment_amount: leftover,
+        overpayment_action: paymentOverpaymentAction
+      });
+      if (overError){ showToast('Could not record overpayment'); console.error(overError); return; }
+
+      if (paymentOverpaymentAction === 'store_credit'){
+        await supabaseClient.from('customers').update({
+          store_credit_balance: round2((customer.store_credit_balance || 0) + leftover)
+        }).eq('id', customer.id);
+      }
+    }
+
+    const updatedCustomer = applyAllocationToCustomer(customer, allocations);
+    const remainingInfo = computeCustomerStatus(updatedCustomer);
+    const paidInFull = remainingInfo.total === 0;
+
+    // Note whether payment landed before/after the due date of the entries it cleared.
+    const clearedDueDates = allocations
+      .filter(a => round2(a.entry.amount_remaining - a.appliedAmount) === 0 && a.entry.due_date)
+      .map(a => a.entry.due_date)
+      .sort();
+    let timingNote = '';
+    if (clearedDueDates.length > 0){
+      const latestCleared = clearedDueDates[clearedDueDates.length - 1];
+      timingNote = todayISO() <= latestCleared ? ' (paid before due date)' : ' (paid after due date)';
+    }
+
+    closeModal('addPaymentModal');
+    await fetchCustomers();
+
+    renderReceiptModal({
+      modalTitle: 'Payment receipt',
+      storeName: STORE_NAME,
+      customerName: customer.name,
+      dateLabel: formatDate(todayISO()),
+      rows: [{label: 'Amount paid', value: peso(amountPaid)}],
+      subtotalLabel: 'Amount paid',
+      subtotalValue: peso(amountPaid),
+      totalLabel: 'Remaining balance',
+      totalValue: peso(remainingInfo.total),
+      banners: [
+        paidInFull
+          ? {status: 'paid', text: `Paid in full${timingNote}`}
+          : {status: remainingInfo.status, text: `${peso(remainingInfo.total)} still due — ${remainingInfo.subtext}`}
+      ]
+    });
+  });
+
+  // --- Receipt modal (shared) ---
+
+  let currentReceiptSpec = null;
+
+  function statusColor(status){
+    const cs = getComputedStyle(document.documentElement);
+    const map = {
+      overdue: {bg: cs.getPropertyValue('--overdue-bg').trim(), text: cs.getPropertyValue('--overdue-text').trim()},
+      active: {bg: cs.getPropertyValue('--active-bg').trim(), text: cs.getPropertyValue('--active-text').trim()},
+      paid: {bg: cs.getPropertyValue('--paid-bg').trim(), text: cs.getPropertyValue('--paid-text').trim()}
+    };
+    return map[status] || map.active;
+  }
+
+  function drawReceipt(canvas, spec){
+    const scale = 2;
+    const width = 380;
+    const padding = 20;
+    const bannerHeight = 44;
+    const rowHeight = 26;
+    let height = 150 + spec.banners.length * (bannerHeight + 10) + spec.rows.length * rowHeight + 90;
+
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, width, height);
+
+    let y = padding + 6;
+    ctx.fillStyle = '#2B2620';
+    ctx.font = '700 18px Poppins, sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillText(spec.storeName, padding, y);
+    y += 26;
+
+    ctx.font = '600 15px Poppins, sans-serif';
+    ctx.fillText(spec.customerName, padding, y);
+    y += 20;
+
+    ctx.font = '400 12px Poppins, sans-serif';
+    ctx.fillStyle = '#8A8378';
+    ctx.fillText(spec.dateLabel, padding, y);
+    y += 22;
+
+    ctx.strokeStyle = '#E8E4DB';
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(width - padding, y);
+    ctx.stroke();
+    y += 14;
+
+    for (const banner of spec.banners){
+      const colors = statusColor(banner.status);
+      ctx.fillStyle = colors.bg;
+      roundRect(ctx, padding, y, width - padding * 2, bannerHeight, 8);
+      ctx.fill();
+      ctx.fillStyle = colors.text;
+      ctx.font = '600 12px Poppins, sans-serif';
+      wrapText(ctx, banner.text, padding + 10, y + 14, width - padding * 2 - 20, 15);
+      y += bannerHeight + 10;
+    }
+
+    ctx.font = '400 13px Poppins, sans-serif';
+    for (const row of spec.rows){
+      ctx.fillStyle = '#2B2620';
+      ctx.textAlign = 'left';
+      ctx.fillText(row.label, padding, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(row.value, width - padding, y);
+      ctx.textAlign = 'left';
+      y += rowHeight;
+    }
+
+    y += 6;
+    ctx.strokeStyle = '#E8E4DB';
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(width - padding, y);
+    ctx.stroke();
+    y += 16;
+
+    ctx.font = '400 13px Poppins, sans-serif';
+    ctx.fillStyle = '#8A8378';
+    ctx.textAlign = 'left';
+    ctx.fillText(spec.subtotalLabel, padding, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(spec.subtotalValue, width - padding, y);
+    y += 24;
+
+    ctx.font = '700 17px Poppins, sans-serif';
+    ctx.fillStyle = '#2B2620';
+    ctx.textAlign = 'left';
+    ctx.fillText(spec.totalLabel, padding, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(spec.totalValue, width - padding, y);
+    ctx.textAlign = 'left';
+  }
+
+  function roundRect(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function wrapText(ctx, text, x, y, maxWidth, lineHeight){
+    const words = text.split(' ');
+    let line = '';
+    let lineY = y;
+    for (const word of words){
+      const testLine = line ? `${line} ${word}` : word;
+      if (ctx.measureText(testLine).width > maxWidth && line){
+        ctx.fillText(line, x, lineY);
+        line = word;
+        lineY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    if (line) ctx.fillText(line, x, lineY);
+  }
+
+  function renderReceiptModal(spec){
+    currentReceiptSpec = spec;
+    document.getElementById('receiptTitle').textContent = spec.modalTitle;
+    drawReceipt(document.getElementById('receiptCanvas'), spec);
+    openModal('receiptModal');
+  }
+
+  document.getElementById('receiptCloseBtn').addEventListener('click', () => closeModal('receiptModal'));
+
+  document.getElementById('receiptSaveBtn').addEventListener('click', () => {
+    const canvas = document.getElementById('receiptCanvas');
+    canvas.toBlob(blob => {
+      if (!blob){ showToast('Could not generate receipt image'); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `receipt-${slug(currentReceiptSpec?.customerName)}-${todayISO()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }, 'image/png');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.customer-picker')){
+      document.querySelectorAll('.picker-dropdown').forEach(d => d.classList.add('hidden'));
+    }
+  });
+
+  // --- Stage 3: pure helpers ---
+
+  // Per-entry status (distinct from computeCustomerStatus, which is worst-status across a customer).
+  function computeEntryStatus(entry){
+    const remaining = Number(entry.amount_remaining);
+    if (remaining <= 0){
+      return {status: 'paid', subtext: 'Paid'};
+    }
+    if (entry.due_date){
+      const days = daysBetween(new Date(entry.due_date + 'T00:00:00'), new Date());
+      if (days > 0){
+        return {status: 'overdue', subtext: `${days} day${days === 1 ? '' : 's'} overdue`};
+      }
+      return {status: 'active', subtext: `Due ${formatDate(entry.due_date)}`};
+    }
+    return {status: 'active', subtext: 'No due date set'};
+  }
+
+  function buildCustomerTimeline(customer){
+    const entryEvents = (customer.utang_entries || []).map(e => ({
+      date: e.created_at,
+      label: `Utang added: ${(e.items || []).map(i => i.name).join(', ') || 'items'}`,
+      amount: e.total_amount,
+      sign: '+'
+    }));
+    const paymentEvents = (customer.payments || []).map(p => ({
+      date: p.date,
+      label: p.overpayment_action === 'store_credit' ? 'Payment (extra kept as store credit)'
+        : p.overpayment_action === 'change_given' ? 'Payment (extra given as change)'
+        : 'Payment received',
+      amount: p.amount,
+      sign: '-'
+    }));
+    return [...entryEvents, ...paymentEvents].sort((a, b) => new Date(b.date) - new Date(a.date));
+  }
+
+  function computeMonthlyTotals(allCustomers, year, month){
+    let given = 0;
+    let collected = 0;
+    for (const c of allCustomers){
+      for (const e of (c.utang_entries || [])){
+        const d = new Date(e.created_at);
+        if (d.getFullYear() === year && d.getMonth() === month) given += Number(e.total_amount);
+      }
+      for (const p of (c.payments || [])){
+        const d = new Date(p.date + 'T00:00:00');
+        if (d.getFullYear() === year && d.getMonth() === month) collected += Number(p.amount);
+      }
+    }
+    given = round2(given);
+    collected = round2(collected);
+    return {given, collected, net: round2(given - collected)};
+  }
+
+  // --- Customer detail modal ---
+
+  let detailCustomer = null;
+
+  function findCustomerById(id){
+    return customers.find(c => c.id === id) || archivedCustomers.find(c => c.id === id) || null;
+  }
+
+  function refreshDetailCustomer(){
+    if (!detailCustomer) return;
+    const fresh = findCustomerById(detailCustomer.id);
+    if (fresh){
+      detailCustomer = fresh;
+      renderCustomerDetail();
+    }
+  }
+
+  function openCustomerDetail(customer){
+    detailCustomer = customer;
+    renderCustomerDetail();
+    openModal('customerDetailModal');
+  }
+
+  function renderCustomerDetail(){
+    const info = computeCustomerStatus(detailCustomer);
+    document.getElementById('detailHeader').className = `modal-header detail-header status-${info.status}`;
+    document.getElementById('detailName').textContent = detailCustomer.name;
+    document.getElementById('detailSub').textContent = info.subtext;
+    document.getElementById('detailTotal').textContent = peso(info.total);
+    renderDetailEntries();
+    renderDetailTimeline();
+  }
+
+  function renderDetailEntries(){
+    const entries = (detailCustomer.utang_entries || []).slice()
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const container = document.getElementById('detailEntries');
+
+    if (entries.length === 0){
+      container.innerHTML = '<div class="empty-state">No utang entries yet.</div>';
+      return;
+    }
+
+    container.innerHTML = entries.map(entry => {
+      const info = computeEntryStatus(entry);
+      const itemsHtml = (entry.items || []).map(i => `<div>${escapeHtml(i.name)} — ${peso(i.amount)}</div>`).join('');
+      const editedNote = (entry.edited_history && entry.edited_history.length > 0)
+        ? `<div class="entry-edited-note">Originally ${peso(entry.edited_history[0].old_value)} · added ${formatDate(String(entry.created_at).slice(0, 10))}</div>`
+        : '';
+      const dueLine = entry.due_date ? ` · Due ${formatDate(entry.due_date)}` : '';
+      return `
+        <div class="entry-card status-${info.status}">
+          <div class="entry-top">
+            <div class="entry-items">${itemsHtml}</div>
+            <div class="entry-pill status-${info.status}">${info.subtext}</div>
+          </div>
+          <div class="entry-meta">Total ${peso(entry.total_amount)} · Remaining ${peso(entry.amount_remaining)}${dueLine}</div>
+          ${editedNote}
+          <div class="entry-actions">
+            <button class="entry-edit-btn" data-edit-id="${entry.id}">Edit</button>
+            <button class="entry-delete-btn" data-delete-id="${entry.id}">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderDetailTimeline(){
+    const events = buildCustomerTimeline(detailCustomer);
+    const container = document.getElementById('detailTimeline');
+
+    if (events.length === 0){
+      container.innerHTML = '<div class="empty-state">No activity yet.</div>';
+      return;
+    }
+
+    container.innerHTML = events.map(ev => `
+      <div class="timeline-item">
+        <div class="timeline-label">
+          <span>${escapeHtml(ev.label)}</span>
+          <span class="timeline-date">${formatDate(String(ev.date).slice(0, 10))}</span>
+        </div>
+        <div class="${ev.sign === '+' ? 'timeline-amount-positive' : 'timeline-amount-negative'}">${ev.sign}${peso(ev.amount)}</div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('customerList').addEventListener('click', (e) => {
+    const card = e.target.closest('.customer-card');
+    if (!card) return;
+    const customer = customers.find(c => c.id === card.dataset.id);
+    if (customer) openCustomerDetail(customer);
+  });
+  document.getElementById('archivedList').addEventListener('click', (e) => {
+    const card = e.target.closest('.customer-card');
+    if (!card) return;
+    const customer = archivedCustomers.find(c => c.id === card.dataset.id);
+    if (customer) openCustomerDetail(customer);
+  });
+
+  document.getElementById('detailCloseBtn').addEventListener('click', () => closeModal('customerDetailModal'));
+
+  function openAddUtangFor(customer){
+    resetUtangModal();
+    utangSelectedCustomer = customer;
+    document.getElementById('utangCustomerInput').value = customer.name;
+    const info = computeCustomerStatus(customer);
+    const line = document.getElementById('utangSelectedLine');
+    line.textContent = `Current: ${info.subtext} (${peso(info.total)})`;
+    line.classList.remove('hidden');
+    renderUtangModal();
+    openModal('addUtangModal');
+  }
+
+  function openAddPaymentFor(customer){
+    resetPaymentModal();
+    paymentSelectedCustomer = customer;
+    document.getElementById('paymentCustomerInput').value = customer.name;
+    const info = computeCustomerStatus(customer);
+    const line = document.getElementById('paymentCurrentTotalLine');
+    line.textContent = `Current total utang: ${peso(info.total)}`;
+    line.classList.remove('hidden');
+    renderPaymentModal();
+    openModal('addPaymentModal');
+  }
+
+  document.getElementById('detailAddUtangBtn').addEventListener('click', () => {
+    closeModal('customerDetailModal');
+    openAddUtangFor(detailCustomer);
+  });
+  document.getElementById('detailAddPaymentBtn').addEventListener('click', () => {
+    closeModal('customerDetailModal');
+    openAddPaymentFor(detailCustomer);
+  });
+
+  // --- Generic confirm modal ---
+
+  let confirmAction = null;
+
+  function openConfirm(message, onConfirm){
+    document.getElementById('confirmMessage').textContent = message;
+    confirmAction = onConfirm;
+    openModal('confirmModal');
+  }
+
+  document.getElementById('confirmCancelBtn').addEventListener('click', () => closeModal('confirmModal'));
+  document.getElementById('confirmOkBtn').addEventListener('click', async () => {
+    const action = confirmAction;
+    confirmAction = null;
+    closeModal('confirmModal');
+    if (action) await action();
+  });
+
+  // --- Edit / delete an utang entry ---
+
+  let editEntryTarget = null;
+  let editEntryItems = [{name: '', amount: ''}];
+
+  function openEditEntry(entry){
+    editEntryTarget = entry;
+    editEntryItems = (entry.items || []).map(i => ({name: i.name, amount: i.amount}));
+    if (editEntryItems.length === 0) editEntryItems = [{name: '', amount: ''}];
+    document.getElementById('editEntryDueDate').value = entry.due_date || '';
+    renderEditEntryItemRows();
+    renderEditEntryModal();
+    openModal('editEntryModal');
+  }
+
+  function renderEditEntryItemRows(){
+    const container = document.getElementById('editEntryItemRows');
+    container.innerHTML = editEntryItems.map((item, i) => `
+      <div class="item-row" data-index="${i}">
+        <input type="text" class="edit-item-name" placeholder="Item name" value="${escapeHtml(item.name)}">
+        <input type="number" class="edit-item-amount" placeholder="Amount" min="0" step="0.01" value="${item.amount}">
+        <button type="button" class="item-remove-btn" data-remove="${i}">&times;</button>
+      </div>
+    `).join('');
+  }
+
+  function editEntryItemsTotal(){
+    return round2(editEntryItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
+  }
+
+  function renderEditEntryModal(){
+    document.getElementById('editEntryTotal').textContent = peso(editEntryItemsTotal());
+  }
+
+  document.getElementById('editEntryItemRows').addEventListener('input', (e) => {
+    const row = e.target.closest('.item-row');
+    if (!row) return;
+    const i = Number(row.dataset.index);
+    if (e.target.classList.contains('edit-item-name')) editEntryItems[i].name = e.target.value;
+    if (e.target.classList.contains('edit-item-amount')) editEntryItems[i].amount = e.target.value;
+    renderEditEntryModal();
+  });
+  document.getElementById('editEntryItemRows').addEventListener('click', (e) => {
+    if (e.target.dataset.remove === undefined) return;
+    const i = Number(e.target.dataset.remove);
+    if (editEntryItems.length > 1) editEntryItems.splice(i, 1);
+    else editEntryItems[0] = {name: '', amount: ''};
+    renderEditEntryItemRows();
+    renderEditEntryModal();
+  });
+  document.getElementById('editEntryAddItemBtn').addEventListener('click', () => {
+    editEntryItems.push({name: '', amount: ''});
+    renderEditEntryItemRows();
+    renderEditEntryModal();
+  });
+  document.getElementById('editEntryCloseBtn').addEventListener('click', () => closeModal('editEntryModal'));
+
+  document.getElementById('editEntrySaveBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    const validItems = editEntryItems.filter(item => item.name.trim() && Number(item.amount) > 0)
+      .map(item => ({name: item.name.trim(), amount: round2(item.amount)}));
+    if (validItems.length === 0){ showToast('Add at least one item'); return; }
+
+    const newTotal = round2(validItems.reduce((sum, item) => sum + item.amount, 0));
+    const dueDate = document.getElementById('editEntryDueDate').value || null;
+    const entry = editEntryTarget;
+    const alreadyPaid = round2(entry.total_amount - entry.amount_remaining);
+    const newRemaining = Math.max(0, round2(newTotal - alreadyPaid));
+
+    let newHistory = entry.edited_history || [];
+    if (newTotal !== Number(entry.total_amount)){
+      newHistory = [...newHistory, {old_value: entry.total_amount, new_value: newTotal, edited_at: new Date().toISOString()}];
+    }
+
+    const {error} = await supabaseClient.from('utang_entries').update({
+      items: validItems,
+      total_amount: newTotal,
+      due_date: dueDate,
+      amount_remaining: newRemaining,
+      edited_history: newHistory
+    }).eq('id', entry.id);
+
+    if (error){ showToast('Could not save changes'); console.error(error); return; }
+
+    closeModal('editEntryModal');
+    await fetchCustomers();
+    refreshDetailCustomer();
+    showToast('Utang entry updated');
+  });
+
+  function openDeleteEntryConfirm(entry){
+    const itemsText = (entry.items || []).map(i => `${i.name} · ${peso(i.amount)}`).join(', ') || 'This utang entry';
+    const message = `${itemsText} (${peso(entry.total_amount)} total) will be removed from ${detailCustomer.name}'s utang`;
+    openConfirm(message, async () => {
+      if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+      const {error} = await supabaseClient.from('utang_entries').delete().eq('id', entry.id);
+      if (error){ showToast('Could not delete entry'); console.error(error); return; }
+      await fetchCustomers();
+      refreshDetailCustomer();
+      showToast('Utang entry deleted');
+    });
+  }
+
+  document.getElementById('detailEntries').addEventListener('click', (e) => {
+    const editBtn = e.target.closest('.entry-edit-btn');
+    const deleteBtn = e.target.closest('.entry-delete-btn');
+    if (editBtn){
+      const entry = detailCustomer.utang_entries.find(en => en.id === editBtn.dataset.editId);
+      if (entry) openEditEntry(entry);
+    }
+    if (deleteBtn){
+      const entry = detailCustomer.utang_entries.find(en => en.id === deleteBtn.dataset.deleteId);
+      if (entry) openDeleteEntryConfirm(entry);
+    }
+  });
+
+  // --- Customer settings modal ---
+
+  document.getElementById('detailSettingsBtn').addEventListener('click', () => {
+    document.getElementById('settingsPaymentTerm').value = detailCustomer.payment_term || 'No fixed date';
+    document.getElementById('settingsCreditLimit').value = detailCustomer.credit_limit ?? '';
+    document.querySelectorAll('input[name="overdueBehavior"]').forEach(r => {
+      r.checked = r.value === (detailCustomer.overdue_behavior || 'warn');
+    });
+    openModal('customerSettingsModal');
+  });
+  document.getElementById('settingsCloseBtn').addEventListener('click', () => closeModal('customerSettingsModal'));
+
+  document.getElementById('settingsSaveBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    const paymentTerm = document.getElementById('settingsPaymentTerm').value;
+    const creditLimitRaw = document.getElementById('settingsCreditLimit').value;
+    const creditLimit = creditLimitRaw === '' ? null : round2(creditLimitRaw);
+    const overdueBehavior = document.querySelector('input[name="overdueBehavior"]:checked')?.value || 'warn';
+
+    const {error} = await supabaseClient.from('customers').update({
+      payment_term: paymentTerm,
+      credit_limit: creditLimit,
+      overdue_behavior: overdueBehavior
+    }).eq('id', detailCustomer.id);
+
+    if (error){ showToast('Could not save settings'); console.error(error); return; }
+
+    closeModal('customerSettingsModal');
+    await fetchCustomers();
+    refreshDetailCustomer();
+    showToast('Settings saved');
+  });
+
+  // --- Monthly report modal ---
+
+  document.getElementById('reportBtn').addEventListener('click', () => {
+    const now = new Date();
+    const totals = computeMonthlyTotals([...customers, ...archivedCustomers], now.getFullYear(), now.getMonth());
+    document.getElementById('reportGiven').textContent = peso(totals.given);
+    document.getElementById('reportCollected').textContent = peso(totals.collected);
+    document.getElementById('reportNet').textContent = (totals.net >= 0 ? '+' : '-') + peso(Math.abs(totals.net));
+    openModal('reportModal');
+  });
+  document.getElementById('reportCloseBtn').addEventListener('click', () => closeModal('reportModal'));
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.getElementById(tab === 'active' ? 'activePanel' : 'archivedPanel').classList.add('active');
+    });
+  });
+
+  document.getElementById('searchInput').addEventListener('input', () => {
+    renderCustomerList('customerList', customers, 'No customers yet. Add one below.');
+  });
+
+  document.getElementById('sortSelect').addEventListener('change', (e) => {
+    currentSort = e.target.value;
+    renderCustomerList('customerList', customers, 'No customers yet. Add one below.');
+  });
+
+  document.getElementById('newCustomerToggle').addEventListener('click', () => {
+    document.getElementById('newCustomerForm').classList.toggle('hidden');
+    document.getElementById('newCustomerName').focus();
+  });
+
+  document.getElementById('newCustomerSave').addEventListener('click', () => {
+    addCustomer(document.getElementById('newCustomerName').value);
+  });
+
+  document.getElementById('newCustomerName').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addCustomer(e.target.value);
+  });
+
+  // --- Stage 4: auth, PIN lock, global settings ---
+
+  let currentUser = null;
+  // Set only when the store-name step just captured a name for the first time —
+  // gates the one-time welcome screen so it never reappears on later logins/PIN changes.
+  let justCompletedOnboarding = false;
+
+  function pinHashKey(userId){
+    return 'utang_pin_hash_' + userId;
+  }
+
+  async function sha256Hex(text){
+    const data = new TextEncoder().encode(text);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function hideAllTopLevelScreens(){
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('storeNameScreen').classList.add('hidden');
+    document.getElementById('welcomeScreen').classList.add('hidden');
+    document.getElementById('appShell').classList.add('hidden');
+  }
+
+  function showAuthScreen(){
+    hideAllTopLevelScreens();
+    document.getElementById('authScreen').classList.remove('hidden');
+    document.getElementById('signupPanel').classList.add('hidden');
+    document.getElementById('loginPanel').classList.remove('hidden');
+  }
+
+  function showStoreNameScreen(){
+    hideAllTopLevelScreens();
+    document.getElementById('storeNameScreen').classList.remove('hidden');
+    document.getElementById('onboardStoreNameInput').value = '';
+  }
+
+  function showWelcomeScreen(){
+    hideAllTopLevelScreens();
+    document.getElementById('welcomeScreen').classList.remove('hidden');
+    const name = currentUser?.user_metadata?.store_name || 'there';
+    document.getElementById('welcomeMessage').textContent = `You're all set, ${name}!`;
+  }
+
+  // Shared by signup-with-immediate-session and login — both need the same
+  // "does this account already have a store name?" branch.
+  async function proceedAfterAuth(user){
+    currentUser = user;
+    if (!currentUser.user_metadata?.store_name){
+      showStoreNameScreen();
+    } else {
+      showPinScreen('setup');
+    }
+  }
+
+  function showPinScreen(mode, allowCancel){
+    hideAllTopLevelScreens();
+    document.getElementById('pinScreen').classList.remove('hidden');
+
+    const isSetup = mode === 'setup';
+    document.getElementById('pinEntryMode').classList.toggle('hidden', isSetup);
+    document.getElementById('pinSetupMode').classList.toggle('hidden', !isSetup);
+    document.getElementById('pinScreenTitle').textContent = isSetup ? 'Set up your PIN' : 'Enter your PIN';
+    document.getElementById('pinScreenSubtitle').textContent = isSetup
+      ? 'For fast access on this device next time'
+      : 'Quick unlock for this device';
+    document.getElementById('pinEntryInput').value = '';
+    document.getElementById('pinSetupInput').value = '';
+    document.getElementById('pinConfirmInput').value = '';
+    document.getElementById('pinEntryError').classList.add('hidden');
+    document.getElementById('pinSetupError').classList.add('hidden');
+    // Cancel is only offered when changing an existing PIN from inside the app —
+    // never during first-time setup or login gating, where there's nothing to return to.
+    document.getElementById('pinSetupCancelRow').classList.toggle('hidden', !(isSetup && allowCancel));
+  }
+
+  async function unlockApp(){
+    STORE_NAME = currentUser?.user_metadata?.store_name || 'My Store';
+    document.getElementById('storeNameLabel').textContent = STORE_NAME;
+    hideAllTopLevelScreens();
+    document.getElementById('appShell').classList.remove('hidden');
+    await fetchCustomers();
+  }
+
+  async function initAuth(){
+    if (!credentialsFilled){
+      showToast('Add your Supabase URL and key in index.html (see README)');
+      hideAllTopLevelScreens();
+      document.getElementById('appShell').classList.remove('hidden');
+      await fetchCustomers();
+      return;
+    }
+    if (!cdnLoaded){
+      showToast('Could not load the Supabase library — check your internet connection and reload');
+      hideAllTopLevelScreens();
+      document.getElementById('appShell').classList.remove('hidden');
+      await fetchCustomers();
+      return;
+    }
+    const {data: {session}} = await supabaseClient.auth.getSession();
+    if (!session){
+      showAuthScreen();
+      return;
+    }
+    currentUser = session.user;
+    if (!currentUser.user_metadata?.store_name){
+      // Covers someone reopening the app mid-onboarding (session persisted,
+      // but they closed the tab before finishing the store-name step).
+      showStoreNameScreen();
+      return;
+    }
+    const savedHash = localStorage.getItem(pinHashKey(currentUser.id));
+    showPinScreen(savedHash ? 'entry' : 'setup');
+  }
+
+  document.getElementById('showSignupLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('loginPanel').classList.add('hidden');
+    document.getElementById('signupPanel').classList.remove('hidden');
+  });
+  document.getElementById('showLoginLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('signupPanel').classList.add('hidden');
+    document.getElementById('loginPanel').classList.remove('hidden');
+  });
+
+  document.getElementById('signupBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    const email = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    if (!email || !password){ showToast('Fill in all fields'); return; }
+
+    const {data, error} = await supabaseClient.auth.signUp({email, password});
+    if (error){ showToast(error.message); console.error(error); return; }
+
+    if (data.session){
+      await proceedAfterAuth(data.user);
+    } else {
+      showToast('Check your email to confirm your account, then log in');
+      document.getElementById('signupPanel').classList.add('hidden');
+      document.getElementById('loginPanel').classList.remove('hidden');
+    }
+  });
+
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!email || !password){ showToast('Enter email and password'); return; }
+
+    const {data, error} = await supabaseClient.auth.signInWithPassword({email, password});
+    if (error){ showToast(error.message); console.error(error); return; }
+
+    await proceedAfterAuth(data.user);
+  });
+
+  document.getElementById('storeNameContinueBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    const name = document.getElementById('onboardStoreNameInput').value.trim();
+    if (!name){ showToast('Enter your store or your name'); return; }
+
+    const {error} = await supabaseClient.auth.updateUser({data: {store_name: name}});
+    if (error){ showToast('Could not save your name'); console.error(error); return; }
+
+    currentUser.user_metadata = {...currentUser.user_metadata, store_name: name};
+    justCompletedOnboarding = true;
+    showPinScreen('setup');
+  });
+
+  document.getElementById('welcomeContinueBtn').addEventListener('click', () => {
+    unlockApp();
+  });
+
+  document.getElementById('pinEntryInput').addEventListener('input', async (e) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+    e.target.value = val;
+    if (val.length === 4){
+      const hash = await sha256Hex(val);
+      const savedHash = localStorage.getItem(pinHashKey(currentUser.id));
+      if (hash === savedHash){
+        unlockApp();
+      } else {
+        document.getElementById('pinEntryError').classList.remove('hidden');
+        e.target.value = '';
+      }
+    }
+  });
+
+  document.getElementById('pinForgotLink').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    showAuthScreen();
+  });
+
+  ['pinSetupInput', 'pinConfirmInput'].forEach(id => {
+    document.getElementById(id).addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
+    });
+  });
+
+  document.getElementById('pinSetupBtn').addEventListener('click', async () => {
+    const pin = document.getElementById('pinSetupInput').value;
+    const confirmPin = document.getElementById('pinConfirmInput').value;
+    if (pin.length !== 4 || confirmPin.length !== 4){ showToast('Enter a 4-digit PIN'); return; }
+    if (pin !== confirmPin){
+      document.getElementById('pinSetupError').classList.remove('hidden');
+      return;
+    }
+    const hash = await sha256Hex(pin);
+    localStorage.setItem(pinHashKey(currentUser.id), hash);
+    if (justCompletedOnboarding){
+      justCompletedOnboarding = false;
+      showWelcomeScreen();
+    } else {
+      unlockApp();
+    }
+  });
+
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    document.getElementById('globalStoreName').value = STORE_NAME;
+    openModal('globalSettingsModal');
+  });
+  document.getElementById('globalSettingsCloseBtn').addEventListener('click', () => closeModal('globalSettingsModal'));
+
+  document.getElementById('globalStoreNameSaveBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    const newName = document.getElementById('globalStoreName').value.trim();
+    if (!newName){ showToast('Store name cannot be empty'); return; }
+    const {error} = await supabaseClient.auth.updateUser({data: {store_name: newName}});
+    if (error){ showToast('Could not update store name'); console.error(error); return; }
+    STORE_NAME = newName;
+    if (currentUser) currentUser.user_metadata = {...currentUser.user_metadata, store_name: newName};
+    document.getElementById('storeNameLabel').textContent = STORE_NAME;
+    showToast('Store name updated');
+  });
+
+  document.getElementById('changePinBtn').addEventListener('click', () => {
+    closeModal('globalSettingsModal');
+    showPinScreen('setup', true);
+  });
+
+  document.getElementById('pinSetupCancelLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    unlockApp();
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    closeModal('globalSettingsModal');
+    showAuthScreen();
+  });
+
+  initAuth().catch(err => {
+    // Last-resort fallback: never leave the page permanently blank on an
+    // unexpected error (e.g. a network blip during getSession()).
+    console.error(err);
+    showToast('Something went wrong loading the app — check your connection and reload');
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('appShell').classList.remove('hidden');
+  });
+</script>
+
+</body>
+</html>
