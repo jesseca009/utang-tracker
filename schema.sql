@@ -15,7 +15,8 @@ create table customers (
   credit_limit numeric,
   payment_term text check (payment_term in ('Payday', 'Weekly', 'No fixed date', 'Custom per entry')),
   store_credit_balance numeric not null default 0,
-  archived boolean not null default false
+  archived boolean not null default false,
+  overdue_behavior text not null default 'warn' check (overdue_behavior in ('warn', 'block'))
 );
 
 create table utang_entries (
@@ -61,6 +62,7 @@ create policy "Allow anon update" on customers for update using (true) with chec
 create policy "Allow anon read" on utang_entries for select using (true);
 create policy "Allow anon insert" on utang_entries for insert with check (true);
 create policy "Allow anon update" on utang_entries for update using (true) with check (true);
+create policy "Allow anon delete" on utang_entries for delete using (true);
 
 create policy "Allow anon read" on payments for select using (true);
 create policy "Allow anon insert" on payments for insert with check (true);
