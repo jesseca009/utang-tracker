@@ -497,6 +497,28 @@
   .report-stat-label{font-size:0.9rem;color:var(--muted);}
   .report-stat-value{font-size:1.2rem;font-weight:700;}
 
+  #authScreen a, #pinScreen a{color:var(--accent);font-weight:600;text-decoration:none;}
+  #authScreen a:hover, #pinScreen a:hover{text-decoration:underline;}
+
+  .receipt-preview-strip{
+    background:var(--bg);
+    border:1px dashed var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+    margin:10px 0 4px;
+    text-align:center;
+  }
+  .receipt-preview-label{font-size:0.72rem;color:var(--muted);margin-bottom:4px;}
+  .receipt-preview-name{font-size:1.1rem;font-weight:700;font-family:'Poppins',sans-serif;}
+
+  .pin-input{
+    text-align:center;
+    font-size:1.6rem;
+    letter-spacing:0.5em;
+    padding:12px;
+  }
+  .pin-error{color:var(--overdue-bg);font-size:0.82rem;margin-top:8px;font-weight:600;}
+
   .confirm-message{font-size:0.92rem;margin:8px 0 18px;line-height:1.5;}
   .confirm-actions{display:flex;gap:10px;}
   .confirm-actions button{flex:1;}
@@ -513,6 +535,67 @@
 </head>
 <body>
 
+<div id="authScreen" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:380px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div class="brand-name" style="font-size:1.4rem;">Utang Tracker</div>
+    </div>
+
+    <div id="loginPanel">
+      <label class="field-label" for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" class="form-input" autocomplete="username">
+      <label class="field-label" for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" class="form-input" autocomplete="current-password">
+      <button class="btn-primary" id="loginBtn" style="width:100%;margin-top:16px;">Log in</button>
+      <div style="text-align:center;margin-top:14px;font-size:0.85rem;">
+        New here? <a href="#" id="showSignupLink">Create an account</a>
+      </div>
+    </div>
+
+    <div id="signupPanel" class="hidden">
+      <label class="field-label" for="signupStoreName">Store or owner name</label>
+      <input type="text" id="signupStoreName" class="form-input" placeholder="e.g. Aling Nena's Store">
+      <div class="receipt-preview-strip">
+        <div class="receipt-preview-label">How this looks on a receipt</div>
+        <div class="receipt-preview-name" id="receiptPreviewName">Your store name</div>
+      </div>
+      <label class="field-label" for="signupEmail">Email</label>
+      <input type="email" id="signupEmail" class="form-input" autocomplete="username">
+      <label class="field-label" for="signupPassword">Password</label>
+      <input type="password" id="signupPassword" class="form-input" autocomplete="new-password">
+      <button class="btn-primary" id="signupBtn" style="width:100%;margin-top:16px;">Create account</button>
+      <div style="text-align:center;margin-top:14px;font-size:0.85rem;">
+        Already have an account? <a href="#" id="showLoginLink">Log in</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pinScreen" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:340px;text-align:center;">
+    <div class="brand-name" style="font-size:1.2rem;margin-bottom:6px;" id="pinScreenTitle">Enter your PIN</div>
+    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:20px;" id="pinScreenSubtitle">Quick unlock for this device</div>
+
+    <div id="pinEntryMode">
+      <input type="password" id="pinEntryInput" class="form-input pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••">
+      <div class="pin-error hidden" id="pinEntryError">Wrong PIN. Try again.</div>
+      <div style="margin-top:16px;font-size:0.85rem;">
+        <a href="#" id="pinForgotLink">Log in with email instead</a>
+      </div>
+    </div>
+
+    <div id="pinSetupMode" class="hidden">
+      <label class="field-label" for="pinSetupInput">Choose a 4-digit PIN</label>
+      <input type="password" id="pinSetupInput" class="form-input pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••">
+      <label class="field-label" for="pinConfirmInput">Confirm PIN</label>
+      <input type="password" id="pinConfirmInput" class="form-input pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••">
+      <div class="pin-error hidden" id="pinSetupError">PINs don't match.</div>
+      <button class="btn-primary" id="pinSetupBtn" style="width:100%;margin-top:12px;">Set PIN</button>
+    </div>
+  </div>
+</div>
+
+<div id="appShell" class="hidden">
 <div class="topbar">
   <div class="brand-name" id="storeNameLabel">My Store</div>
   <div style="display:flex;align-items:center;">
@@ -568,6 +651,7 @@
   </div>
 
 </main>
+</div>
 
 <div class="modal-overlay hidden" id="addUtangModal">
   <div class="modal-sheet">
@@ -744,6 +828,24 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="globalSettingsModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3>Settings</h3>
+      <button class="modal-close" id="globalSettingsCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label" for="globalStoreName">Store name</label>
+      <input type="text" id="globalStoreName" class="form-input">
+      <button class="btn-primary" id="globalStoreNameSaveBtn" style="width:100%;margin-top:10px;">Save store name</button>
+
+      <label class="field-label" style="margin-top:24px;">Security</label>
+      <button class="btn-secondary" id="changePinBtn" style="width:100%;">Change PIN</button>
+      <button class="btn-danger" id="logoutBtn" style="width:100%;margin-top:10px;">Log out</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="confirmModal">
   <div class="modal-sheet" style="border-radius:18px;max-width:400px;">
     <div class="modal-body" style="padding-top:20px;">
@@ -779,7 +881,7 @@
   const supabaseReady = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
   const supabase = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
-  const STORE_NAME = localStorage.getItem('utang_store_name') || 'My Store';
+  let STORE_NAME = 'My Store';
   document.getElementById('storeNameLabel').textContent = STORE_NAME;
 
   let customers = [];
@@ -1951,15 +2053,194 @@
     if (e.key === 'Enter') addCustomer(e.target.value);
   });
 
-  document.getElementById('settingsBtn').addEventListener('click', () => {
-    showToast('Settings screen is coming in a later stage');
-  });
+  // --- Stage 4: auth, PIN lock, global settings ---
 
-  if (!supabaseReady){
-    showToast('Add your Supabase URL and key in index.html (see README)');
+  let currentUser = null;
+
+  function pinHashKey(userId){
+    return 'utang_pin_hash_' + userId;
   }
 
-  fetchCustomers();
+  async function sha256Hex(text){
+    const data = new TextEncoder().encode(text);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function showAuthScreen(){
+    document.getElementById('authScreen').classList.remove('hidden');
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('appShell').classList.add('hidden');
+    document.getElementById('signupPanel').classList.add('hidden');
+    document.getElementById('loginPanel').classList.remove('hidden');
+  }
+
+  function showPinScreen(mode){
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('pinScreen').classList.remove('hidden');
+    document.getElementById('appShell').classList.add('hidden');
+
+    const isSetup = mode === 'setup';
+    document.getElementById('pinEntryMode').classList.toggle('hidden', isSetup);
+    document.getElementById('pinSetupMode').classList.toggle('hidden', !isSetup);
+    document.getElementById('pinScreenTitle').textContent = isSetup ? 'Set up your PIN' : 'Enter your PIN';
+    document.getElementById('pinScreenSubtitle').textContent = isSetup
+      ? 'For fast access on this device next time'
+      : 'Quick unlock for this device';
+    document.getElementById('pinEntryInput').value = '';
+    document.getElementById('pinSetupInput').value = '';
+    document.getElementById('pinConfirmInput').value = '';
+    document.getElementById('pinEntryError').classList.add('hidden');
+    document.getElementById('pinSetupError').classList.add('hidden');
+  }
+
+  async function unlockApp(){
+    STORE_NAME = currentUser?.user_metadata?.store_name || 'My Store';
+    document.getElementById('storeNameLabel').textContent = STORE_NAME;
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('appShell').classList.remove('hidden');
+    await fetchCustomers();
+  }
+
+  async function initAuth(){
+    if (!supabaseReady){
+      showToast('Add your Supabase URL and key in index.html (see README)');
+      document.getElementById('appShell').classList.remove('hidden');
+      return;
+    }
+    const {data: {session}} = await supabase.auth.getSession();
+    if (!session){
+      showAuthScreen();
+      return;
+    }
+    currentUser = session.user;
+    const savedHash = localStorage.getItem(pinHashKey(currentUser.id));
+    showPinScreen(savedHash ? 'entry' : 'setup');
+  }
+
+  document.getElementById('showSignupLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('loginPanel').classList.add('hidden');
+    document.getElementById('signupPanel').classList.remove('hidden');
+  });
+  document.getElementById('showLoginLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('signupPanel').classList.add('hidden');
+    document.getElementById('loginPanel').classList.remove('hidden');
+  });
+
+  document.getElementById('signupStoreName').addEventListener('input', (e) => {
+    document.getElementById('receiptPreviewName').textContent = e.target.value.trim() || 'Your store name';
+  });
+
+  document.getElementById('signupBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    const storeName = document.getElementById('signupStoreName').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    if (!storeName || !email || !password){ showToast('Fill in all fields'); return; }
+
+    const {data, error} = await supabase.auth.signUp({
+      email, password, options: {data: {store_name: storeName}}
+    });
+    if (error){ showToast(error.message); console.error(error); return; }
+
+    if (data.session){
+      currentUser = data.user;
+      showPinScreen('setup');
+    } else {
+      showToast('Check your email to confirm your account, then log in');
+      document.getElementById('signupPanel').classList.add('hidden');
+      document.getElementById('loginPanel').classList.remove('hidden');
+    }
+  });
+
+  document.getElementById('loginBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!email || !password){ showToast('Enter email and password'); return; }
+
+    const {data, error} = await supabase.auth.signInWithPassword({email, password});
+    if (error){ showToast(error.message); console.error(error); return; }
+
+    currentUser = data.user;
+    showPinScreen('setup');
+  });
+
+  document.getElementById('pinEntryInput').addEventListener('input', async (e) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+    e.target.value = val;
+    if (val.length === 4){
+      const hash = await sha256Hex(val);
+      const savedHash = localStorage.getItem(pinHashKey(currentUser.id));
+      if (hash === savedHash){
+        unlockApp();
+      } else {
+        document.getElementById('pinEntryError').classList.remove('hidden');
+        e.target.value = '';
+      }
+    }
+  });
+
+  document.getElementById('pinForgotLink').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await supabase.auth.signOut();
+    currentUser = null;
+    showAuthScreen();
+  });
+
+  ['pinSetupInput', 'pinConfirmInput'].forEach(id => {
+    document.getElementById(id).addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
+    });
+  });
+
+  document.getElementById('pinSetupBtn').addEventListener('click', async () => {
+    const pin = document.getElementById('pinSetupInput').value;
+    const confirmPin = document.getElementById('pinConfirmInput').value;
+    if (pin.length !== 4 || confirmPin.length !== 4){ showToast('Enter a 4-digit PIN'); return; }
+    if (pin !== confirmPin){
+      document.getElementById('pinSetupError').classList.remove('hidden');
+      return;
+    }
+    const hash = await sha256Hex(pin);
+    localStorage.setItem(pinHashKey(currentUser.id), hash);
+    unlockApp();
+  });
+
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    document.getElementById('globalStoreName').value = STORE_NAME;
+    openModal('globalSettingsModal');
+  });
+  document.getElementById('globalSettingsCloseBtn').addEventListener('click', () => closeModal('globalSettingsModal'));
+
+  document.getElementById('globalStoreNameSaveBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    const newName = document.getElementById('globalStoreName').value.trim();
+    if (!newName){ showToast('Store name cannot be empty'); return; }
+    const {error} = await supabase.auth.updateUser({data: {store_name: newName}});
+    if (error){ showToast('Could not update store name'); console.error(error); return; }
+    STORE_NAME = newName;
+    if (currentUser) currentUser.user_metadata = {...currentUser.user_metadata, store_name: newName};
+    document.getElementById('storeNameLabel').textContent = STORE_NAME;
+    showToast('Store name updated');
+  });
+
+  document.getElementById('changePinBtn').addEventListener('click', () => {
+    closeModal('globalSettingsModal');
+    showPinScreen('setup');
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    currentUser = null;
+    closeModal('globalSettingsModal');
+    showAuthScreen();
+  });
+
+  initAuth();
 </script>
 
 </body>
