@@ -18,7 +18,7 @@ Single static `index.html` (vanilla JS + the Supabase JS client via CDN), a Supa
    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
    ```
-5. Open `index.html` in a browser (or deploy the folder to GitHub Pages / any static host). Create your account on the signup screen, then set a 4-digit PIN when prompted. Under **Authentication → Providers → Email** in Supabase, "Confirm email" is on by default — if so, you'll need to confirm via the email link before you can log in; turn it off in a test project if you'd rather skip that step.
+5. Open `index.html` in a browser (or deploy the folder to GitHub Pages / any static host). Create your account on the signup screen (email + password), confirm your email if prompted, then set your store/owner name, set a 4-digit PIN, and continue through the one-time welcome screen. Under **Authentication → Providers → Email** in Supabase, "Confirm email" is on by default — if so, you'll need to confirm via the email link before you can log in; turn it off in a test project if you'd rather skip that step.
 6. Once you've confirmed signup and login both work, run `migration_v3_lockdown_rls.sql`. This requires being logged in for all database reads/writes — do this before any real customer data goes in, but not before, since it'll block the anon-key testing you were doing up to this point.
 
 ## What works right now
@@ -32,6 +32,6 @@ Single static `index.html` (vanilla JS + the Supabase JS client via CDN), a Supa
 - **Edit / delete an utang entry**: edit items or due date anytime; if the total changes, a permanent "Originally ₱X · added [date]" note appears and never disappears, even after further edits. Delete requires confirming the exact items being removed (not a generic "are you sure?").
 - **Customer settings**: payment term, credit limit, and "if overdue" behavior — "Warn me, let me decide" (today's default) or "Block new utang until they pay," which turns the overdue warning in Add utang into a hard block.
 - **Monthly report** (top-bar icon): total utang given this month, total collected this month, and the net change — computed from what's already loaded, no extra queries.
-- **Signup / login / PIN lock**: create an account with your store or owner name, email, and password (with a live preview of how the name looks on a receipt); log in with Supabase email/password; set a 4-digit PIN afterward for fast repeat access on that device (a "Log in with email instead" link handles a forgotten PIN). The top-bar gear icon now opens real settings — edit the store name, change the PIN, or log out.
+- **Signup / login / PIN lock**: sign up with just email and password. First time through, you're then asked for your store or owner name (with a live preview of how it looks on a receipt — required, since every receipt needs it), then a 4-digit PIN for fast repeat access on that device, then a one-time "You're all set" welcome screen before the dashboard. Returning logins skip straight to PIN entry (or, on a new device, PIN setup) without repeating the name or welcome steps. A "Log in with email instead" link on the PIN screen handles a forgotten PIN. The top-bar gear icon opens real settings — edit the store name, change the PIN, or log out.
 
 Receipts sent via Messenger and CSV export remain out of scope per the spec.

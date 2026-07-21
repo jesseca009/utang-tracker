@@ -553,12 +553,6 @@
     </div>
 
     <div id="signupPanel" class="hidden">
-      <label class="field-label" for="signupStoreName">Store or owner name</label>
-      <input type="text" id="signupStoreName" class="form-input" placeholder="e.g. Aling Nena's Store">
-      <div class="receipt-preview-strip">
-        <div class="receipt-preview-label">How this looks on a receipt</div>
-        <div class="receipt-preview-name" id="receiptPreviewName">Your store name</div>
-      </div>
       <label class="field-label" for="signupEmail">Email</label>
       <input type="email" id="signupEmail" class="form-input" autocomplete="username">
       <label class="field-label" for="signupPassword">Password</label>
@@ -595,6 +589,30 @@
         <a href="#" id="pinSetupCancelLink">Cancel</a>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="storeNameScreen" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:380px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div class="brand-name" style="font-size:1.25rem;">What's your store or your name?</div>
+      <div style="font-size:0.85rem;color:var(--muted);margin-top:6px;">This appears on every receipt</div>
+    </div>
+    <label class="field-label" for="onboardStoreNameInput">Store or owner name</label>
+    <input type="text" id="onboardStoreNameInput" class="form-input" placeholder="e.g. Aling Nena's Store">
+    <div class="receipt-preview-strip">
+      <div class="receipt-preview-label">How this looks on a receipt</div>
+      <div class="receipt-preview-name" id="onboardReceiptPreviewName">Your store name</div>
+    </div>
+    <button class="btn-primary" id="storeNameContinueBtn" style="width:100%;margin-top:16px;">Continue</button>
+  </div>
+</div>
+
+<div id="welcomeScreen" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="width:100%;max-width:380px;text-align:center;">
+    <div class="brand-name" style="font-size:1.4rem;" id="welcomeMessage">You're all set!</div>
+    <div style="font-size:0.9rem;color:var(--muted);margin-top:12px;line-height:1.5;">Tap "Add utang" to log your first customer.</div>
+    <button class="btn-primary" id="welcomeContinueBtn" style="width:100%;margin-top:24px;">Go to dashboard</button>
   </div>
 </div>
 
@@ -2064,6 +2082,9 @@
   // --- Stage 4: auth, PIN lock, global settings ---
 
   let currentUser = null;
+  // Set only when the store-name step just captured a name for the first time —
+  // gates the one-time welcome screen so it never reappears on later logins/PIN changes.
+  let justCompletedOnboarding = false;
 
   function pinHashKey(userId){
     return 'utang_pin_hash_' + userId;
@@ -2075,18 +2096,49 @@
     return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
-  function showAuthScreen(){
-    document.getElementById('authScreen').classList.remove('hidden');
+  function hideAllTopLevelScreens(){
+    document.getElementById('authScreen').classList.add('hidden');
     document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('storeNameScreen').classList.add('hidden');
+    document.getElementById('welcomeScreen').classList.add('hidden');
     document.getElementById('appShell').classList.add('hidden');
+  }
+
+  function showAuthScreen(){
+    hideAllTopLevelScreens();
+    document.getElementById('authScreen').classList.remove('hidden');
     document.getElementById('signupPanel').classList.add('hidden');
     document.getElementById('loginPanel').classList.remove('hidden');
   }
 
+  function showStoreNameScreen(){
+    hideAllTopLevelScreens();
+    document.getElementById('storeNameScreen').classList.remove('hidden');
+    document.getElementById('onboardStoreNameInput').value = '';
+    document.getElementById('onboardReceiptPreviewName').textContent = 'Your store name';
+  }
+
+  function showWelcomeScreen(){
+    hideAllTopLevelScreens();
+    document.getElementById('welcomeScreen').classList.remove('hidden');
+    const name = currentUser?.user_metadata?.store_name || 'there';
+    document.getElementById('welcomeMessage').textContent = `You're all set, ${name}!`;
+  }
+
+  // Shared by signup-with-immediate-session and login — both need the same
+  // "does this account already have a store name?" branch.
+  async function proceedAfterAuth(user){
+    currentUser = user;
+    if (!currentUser.user_metadata?.store_name){
+      showStoreNameScreen();
+    } else {
+      showPinScreen('setup');
+    }
+  }
+
   function showPinScreen(mode, allowCancel){
-    document.getElementById('authScreen').classList.add('hidden');
+    hideAllTopLevelScreens();
     document.getElementById('pinScreen').classList.remove('hidden');
-    document.getElementById('appShell').classList.add('hidden');
 
     const isSetup = mode === 'setup';
     document.getElementById('pinEntryMode').classList.toggle('hidden', isSetup);
@@ -2108,8 +2160,7 @@
   async function unlockApp(){
     STORE_NAME = currentUser?.user_metadata?.store_name || 'My Store';
     document.getElementById('storeNameLabel').textContent = STORE_NAME;
-    document.getElementById('authScreen').classList.add('hidden');
-    document.getElementById('pinScreen').classList.add('hidden');
+    hideAllTopLevelScreens();
     document.getElementById('appShell').classList.remove('hidden');
     await fetchCustomers();
   }
@@ -2117,12 +2168,14 @@
   async function initAuth(){
     if (!credentialsFilled){
       showToast('Add your Supabase URL and key in index.html (see README)');
+      hideAllTopLevelScreens();
       document.getElementById('appShell').classList.remove('hidden');
       await fetchCustomers();
       return;
     }
     if (!cdnLoaded){
       showToast('Could not load the Supabase library — check your internet connection and reload');
+      hideAllTopLevelScreens();
       document.getElementById('appShell').classList.remove('hidden');
       await fetchCustomers();
       return;
@@ -2133,6 +2186,12 @@
       return;
     }
     currentUser = session.user;
+    if (!currentUser.user_metadata?.store_name){
+      // Covers someone reopening the app mid-onboarding (session persisted,
+      // but they closed the tab before finishing the store-name step).
+      showStoreNameScreen();
+      return;
+    }
     const savedHash = localStorage.getItem(pinHashKey(currentUser.id));
     showPinScreen(savedHash ? 'entry' : 'setup');
   }
@@ -2148,25 +2207,17 @@
     document.getElementById('loginPanel').classList.remove('hidden');
   });
 
-  document.getElementById('signupStoreName').addEventListener('input', (e) => {
-    document.getElementById('receiptPreviewName').textContent = e.target.value.trim() || 'Your store name';
-  });
-
   document.getElementById('signupBtn').addEventListener('click', async () => {
     if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
-    const storeName = document.getElementById('signupStoreName').value.trim();
     const email = document.getElementById('signupEmail').value.trim();
     const password = document.getElementById('signupPassword').value;
-    if (!storeName || !email || !password){ showToast('Fill in all fields'); return; }
+    if (!email || !password){ showToast('Fill in all fields'); return; }
 
-    const {data, error} = await supabaseClient.auth.signUp({
-      email, password, options: {data: {store_name: storeName}}
-    });
+    const {data, error} = await supabaseClient.auth.signUp({email, password});
     if (error){ showToast(error.message); console.error(error); return; }
 
     if (data.session){
-      currentUser = data.user;
-      showPinScreen('setup');
+      await proceedAfterAuth(data.user);
     } else {
       showToast('Check your email to confirm your account, then log in');
       document.getElementById('signupPanel').classList.add('hidden');
@@ -2183,8 +2234,28 @@
     const {data, error} = await supabaseClient.auth.signInWithPassword({email, password});
     if (error){ showToast(error.message); console.error(error); return; }
 
-    currentUser = data.user;
+    await proceedAfterAuth(data.user);
+  });
+
+  document.getElementById('onboardStoreNameInput').addEventListener('input', (e) => {
+    document.getElementById('onboardReceiptPreviewName').textContent = e.target.value.trim() || 'Your store name';
+  });
+
+  document.getElementById('storeNameContinueBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    const name = document.getElementById('onboardStoreNameInput').value.trim();
+    if (!name){ showToast('Enter your store or your name'); return; }
+
+    const {error} = await supabaseClient.auth.updateUser({data: {store_name: name}});
+    if (error){ showToast('Could not save your name'); console.error(error); return; }
+
+    currentUser.user_metadata = {...currentUser.user_metadata, store_name: name};
+    justCompletedOnboarding = true;
     showPinScreen('setup');
+  });
+
+  document.getElementById('welcomeContinueBtn').addEventListener('click', () => {
+    unlockApp();
   });
 
   document.getElementById('pinEntryInput').addEventListener('input', async (e) => {
@@ -2225,7 +2296,12 @@
     }
     const hash = await sha256Hex(pin);
     localStorage.setItem(pinHashKey(currentUser.id), hash);
-    unlockApp();
+    if (justCompletedOnboarding){
+      justCompletedOnboarding = false;
+      showWelcomeScreen();
+    } else {
+      unlockApp();
+    }
   });
 
   document.getElementById('settingsBtn').addEventListener('click', () => {
