@@ -214,6 +214,180 @@
     box-shadow:var(--shadow);
     z-index:50;
   }
+
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(43,38,32,0.45);
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:100;
+  }
+  .modal-sheet{
+    background:var(--card-bg);
+    width:100%;
+    max-width:520px;
+    max-height:92vh;
+    overflow-y:auto;
+    border-radius:18px 18px 0 0;
+    box-shadow:var(--shadow);
+  }
+  .modal-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:16px 18px 8px;
+    position:sticky;
+    top:0;
+    background:var(--card-bg);
+    z-index:1;
+  }
+  .modal-header h3{margin:0;}
+  .modal-close{
+    background:transparent;
+    border:none;
+    font-size:1.5rem;
+    color:var(--muted);
+    line-height:1;
+    padding:4px 8px;
+  }
+  .modal-body{padding:4px 18px 8px;}
+  .modal-actions{
+    padding:12px 18px 18px;
+    position:sticky;
+    bottom:0;
+    background:var(--card-bg);
+  }
+  .modal-actions .btn-primary:disabled{
+    opacity:0.5;
+    cursor:not-allowed;
+  }
+
+  .field-label{
+    display:block;
+    font-size:0.78rem;
+    color:var(--muted);
+    margin:14px 0 6px;
+    font-weight:600;
+  }
+  .form-input{
+    width:100%;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    font-size:0.92rem;
+  }
+
+  .customer-picker{position:relative;}
+  .picker-dropdown{
+    position:absolute;
+    left:0;right:0;
+    top:calc(100% + 4px);
+    background:var(--card-bg);
+    border:1px solid var(--border);
+    border-radius:10px;
+    box-shadow:var(--shadow);
+    max-height:180px;
+    overflow-y:auto;
+    z-index:10;
+  }
+  .picker-option{
+    padding:10px 12px;
+    font-size:0.88rem;
+    cursor:pointer;
+  }
+  .picker-option:hover{background:var(--bg);}
+  .picker-option.picker-new{color:var(--accent);font-weight:600;}
+  .picker-empty{padding:10px 12px;font-size:0.85rem;color:var(--muted);}
+
+  .selected-customer-line{
+    font-size:0.85rem;
+    color:var(--muted);
+    margin-top:6px;
+  }
+
+  .banner{
+    border-radius:10px;
+    padding:12px 14px;
+    font-size:0.85rem;
+    font-weight:600;
+    margin:12px 0;
+  }
+  .banner-overdue, .banner-overlimit{background:var(--overdue-bg);color:var(--overdue-text);}
+  .banner-active{background:var(--active-bg);color:var(--active-text);}
+  .banner-paid{background:var(--paid-bg);color:var(--paid-text);}
+  .checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:8px;
+    font-weight:600;
+    font-size:0.85rem;
+  }
+
+  .store-credit-note{
+    font-size:0.82rem;
+    color:var(--accent);
+    font-weight:600;
+    margin:8px 0;
+  }
+
+  .item-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+    align-items:center;
+  }
+  .item-row input[type="text"]{flex:1.4;min-width:0;}
+  .item-row input[type="number"]{flex:1;min-width:0;}
+  .item-row input{
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    font-size:0.9rem;
+  }
+  .item-remove-btn{
+    background:transparent;
+    border:none;
+    color:var(--muted);
+    font-size:1.2rem;
+    padding:4px 8px;
+    line-height:1;
+    flex:none;
+  }
+
+  .totals-box{
+    background:var(--bg);
+    border-radius:10px;
+    padding:12px 14px;
+    margin-top:14px;
+  }
+  .totals-line{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.88rem;
+    padding:4px 0;
+  }
+  .totals-line-strong{font-weight:700;font-size:1rem;}
+
+  .radio-group{margin:10px 0;}
+  .radio-option{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 0;
+    font-size:0.88rem;
+  }
+
+  .receipt-body{display:flex;justify-content:center;}
+  .receipt-canvas{
+    width:100%;
+    max-width:400px;
+    height:auto;
+    border-radius:10px;
+    box-shadow:var(--shadow);
+  }
 </style>
 </head>
 <body>
@@ -270,6 +444,95 @@
   </div>
 
 </main>
+
+<div class="modal-overlay hidden" id="addUtangModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3>Add utang</h3>
+      <button class="modal-close" id="utangCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label" for="utangCustomerInput">Customer</label>
+      <div class="customer-picker">
+        <input type="text" id="utangCustomerInput" class="form-input" placeholder="Search or type a new name" autocomplete="off">
+        <div class="picker-dropdown hidden" id="utangCustomerDropdown"></div>
+      </div>
+      <div class="selected-customer-line hidden" id="utangSelectedLine"></div>
+
+      <div id="utangOverdueBanner" class="banner banner-overdue hidden"></div>
+      <div id="utangOverLimitBanner" class="banner banner-overlimit hidden">
+        <div id="utangOverLimitText"></div>
+        <label class="checkbox-row"><input type="checkbox" id="utangAddAnyway"> Add anyway</label>
+      </div>
+      <div id="utangStoreCreditNote" class="store-credit-note hidden"></div>
+
+      <label class="field-label">Items</label>
+      <div id="utangItemRows"></div>
+      <button class="btn-secondary" id="utangAddItemBtn" type="button">+ Add item</button>
+
+      <label class="field-label" for="utangDueDate">Due date (optional)</label>
+      <input type="date" id="utangDueDate" class="form-input">
+
+      <div class="totals-box">
+        <div class="totals-line"><span>This entry</span><span id="utangThisEntryTotal">₱ 0</span></div>
+        <div class="totals-line totals-line-strong"><span>New total utang</span><span id="utangNewTotal">₱ 0</span></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="utangSaveBtn">Save utang</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="addPaymentModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3>Add payment</h3>
+      <button class="modal-close" id="paymentCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label" for="paymentCustomerInput">Customer</label>
+      <div class="customer-picker">
+        <input type="text" id="paymentCustomerInput" class="form-input" placeholder="Search customer" autocomplete="off">
+        <div class="picker-dropdown hidden" id="paymentCustomerDropdown"></div>
+      </div>
+      <div class="selected-customer-line hidden" id="paymentCurrentTotalLine"></div>
+
+      <label class="field-label" for="paymentAmount">Amount paid</label>
+      <input type="number" id="paymentAmount" class="form-input" placeholder="0" min="0" step="0.01">
+
+      <div id="paymentOverpaidBanner" class="banner banner-overdue hidden">
+        <div id="paymentOverpaidText"></div>
+        <div class="radio-group">
+          <label class="radio-option"><input type="radio" name="overpaymentAction" value="change_given"> Gave change back to customer</label>
+          <label class="radio-option"><input type="radio" name="overpaymentAction" value="store_credit"> Keep as store credit for next utang</label>
+        </div>
+      </div>
+
+      <div class="totals-box">
+        <div class="totals-line totals-line-strong"><span>Remaining balance</span><span id="paymentRemainingTotal">₱ 0</span></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="paymentSaveBtn">Save payment</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="receiptModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3 id="receiptTitle">Receipt</h3>
+      <button class="modal-close" id="receiptCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body receipt-body">
+      <canvas id="receiptCanvas" class="receipt-canvas"></canvas>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="receiptSaveBtn">Save receipt</button>
+    </div>
+  </div>
+</div>
 
 <script>
   // --- Fill these in from your Supabase project (Project Settings > API) ---
@@ -434,6 +697,619 @@
     showToast('Customer added');
   }
 
+  // --- Stage 2: shared pure helpers ---
+
+  function round2(n){
+    return Math.round((Number(n || 0) + Number.EPSILON) * 100) / 100;
+  }
+
+  function todayISO(){
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function slug(str){
+    return (str || 'customer').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  }
+
+  // FIFO order: oldest incurred debt first.
+  function getUnpaidEntriesOldestFirst(customer){
+    return (customer?.utang_entries || [])
+      .filter(e => Number(e.amount_remaining) > 0)
+      .slice()
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  }
+
+  // Pure allocation function — used for both the live preview and the actual save.
+  function simulateAllocation(entriesOldestFirst, amountPaid){
+    let remaining = round2(amountPaid);
+    const allocations = [];
+    for (const entry of entriesOldestFirst){
+      if (remaining <= 0) break;
+      const owed = round2(entry.amount_remaining);
+      const applied = round2(Math.min(owed, remaining));
+      if (applied > 0){
+        allocations.push({entry, appliedAmount: applied});
+        remaining = round2(remaining - applied);
+      }
+    }
+    return {allocations, leftover: Math.max(0, round2(remaining))};
+  }
+
+  function computeNewEntryTotals(customer, itemsTotal){
+    const existingUnpaidTotal = getUnpaidEntriesOldestFirst(customer).reduce((sum, e) => sum + Number(e.amount_remaining), 0);
+    const storeCreditAvailable = Number(customer?.store_credit_balance || 0);
+    const storeCreditApplied = round2(Math.min(storeCreditAvailable, itemsTotal));
+    const amountRemaining = round2(itemsTotal - storeCreditApplied);
+    const newTotalUtang = round2(existingUnpaidTotal + amountRemaining);
+    return {existingUnpaidTotal: round2(existingUnpaidTotal), storeCreditApplied, amountRemaining, newTotalUtang};
+  }
+
+  function checkCreditLimit(customer, prospectiveTotal){
+    const limit = customer?.credit_limit;
+    if (limit === null || limit === undefined || limit === '') return {exceeds: false, limit: null};
+    return {exceeds: prospectiveTotal > Number(limit), limit: Number(limit)};
+  }
+
+  // Applies an allocation to a cloned customer so we can reuse computeCustomerStatus
+  // for the "remaining balance / still overdue?" wording on the payment receipt.
+  function applyAllocationToCustomer(customer, allocations){
+    const appliedByEntryId = new Map(allocations.map(a => [a.entry.id, a.appliedAmount]));
+    return {
+      ...customer,
+      utang_entries: (customer.utang_entries || []).map(e => {
+        const applied = appliedByEntryId.get(e.id);
+        return applied ? {...e, amount_remaining: round2(e.amount_remaining - applied)} : e;
+      })
+    };
+  }
+
+  // --- Modal open/close helpers ---
+
+  function openModal(id){ document.getElementById(id).classList.remove('hidden'); }
+  function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
+
+  // --- Customer picker (shared by Add utang + Add payment) ---
+
+  function renderCustomerDropdown(dropdownEl, query, list, {allowNew}){
+    const q = query.trim().toLowerCase();
+    const matches = q ? list.filter(c => c.name.toLowerCase().includes(q)) : list;
+    let html = matches.slice(0, 8).map(c => `<div class="picker-option" data-id="${c.id}">${escapeHtml(c.name)}</div>`).join('');
+    const exactMatch = list.some(c => c.name.toLowerCase() === q);
+    if (allowNew && q && !exactMatch){
+      html += `<div class="picker-option picker-new" data-new="${escapeHtml(query.trim())}">+ Add "${escapeHtml(query.trim())}" as new customer</div>`;
+    }
+    if (!html){
+      html = `<div class="picker-empty">No matching customers</div>`;
+    }
+    dropdownEl.innerHTML = html;
+    dropdownEl.classList.remove('hidden');
+  }
+
+  // --- Add utang modal ---
+
+  let utangSelectedCustomer = null;
+  let utangNewCustomerName = null;
+  let utangItems = [{name: '', amount: ''}];
+  let utangAddAnywayChecked = false;
+
+  function utangCustomerForCalc(){
+    return utangSelectedCustomer || {utang_entries: [], store_credit_balance: 0, credit_limit: null};
+  }
+
+  function resetUtangModal(){
+    utangSelectedCustomer = null;
+    utangNewCustomerName = null;
+    utangItems = [{name: '', amount: ''}];
+    utangAddAnywayChecked = false;
+    document.getElementById('utangCustomerInput').value = '';
+    document.getElementById('utangDueDate').value = '';
+    document.getElementById('utangCustomerDropdown').classList.add('hidden');
+    document.getElementById('utangSelectedLine').classList.add('hidden');
+    renderUtangItemRows();
+    renderUtangModal();
+  }
+
+  function renderUtangItemRows(){
+    const container = document.getElementById('utangItemRows');
+    container.innerHTML = utangItems.map((item, i) => `
+      <div class="item-row" data-index="${i}">
+        <input type="text" class="utang-item-name" placeholder="Item name" value="${escapeHtml(item.name)}">
+        <input type="number" class="utang-item-amount" placeholder="Amount" min="0" step="0.01" value="${item.amount}">
+        <button type="button" class="item-remove-btn" data-remove="${i}">&times;</button>
+      </div>
+    `).join('');
+  }
+
+  function utangItemsTotal(){
+    return round2(utangItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
+  }
+
+  function renderUtangModal(){
+    const customer = utangCustomerForCalc();
+    const itemsTotal = utangItemsTotal();
+    const totals = computeNewEntryTotals(customer, itemsTotal);
+    const creditCheck = checkCreditLimit(customer, totals.newTotalUtang);
+    const overdueInfo = utangSelectedCustomer ? computeCustomerStatus(utangSelectedCustomer) : null;
+
+    const overdueBanner = document.getElementById('utangOverdueBanner');
+    if (overdueInfo && overdueInfo.status === 'overdue'){
+      overdueBanner.textContent = `${peso(overdueInfo.total)} already overdue — ${overdueInfo.subtext}`;
+      overdueBanner.classList.remove('hidden');
+    } else {
+      overdueBanner.classList.add('hidden');
+    }
+
+    const overLimitBanner = document.getElementById('utangOverLimitBanner');
+    if (creditCheck.exceeds){
+      document.getElementById('utangOverLimitText').textContent =
+        `This would bring total utang to ${peso(totals.newTotalUtang)}, over the ${peso(creditCheck.limit)} credit limit.`;
+      overLimitBanner.classList.remove('hidden');
+    } else {
+      overLimitBanner.classList.add('hidden');
+      utangAddAnywayChecked = false;
+      document.getElementById('utangAddAnyway').checked = false;
+    }
+
+    const creditNote = document.getElementById('utangStoreCreditNote');
+    if (totals.storeCreditApplied > 0){
+      creditNote.textContent = `Store credit applied: -${peso(totals.storeCreditApplied)}`;
+      creditNote.classList.remove('hidden');
+    } else {
+      creditNote.classList.add('hidden');
+    }
+
+    document.getElementById('utangThisEntryTotal').textContent = peso(itemsTotal);
+    document.getElementById('utangNewTotal').textContent = peso(totals.newTotalUtang);
+
+    const hasCustomer = !!(utangSelectedCustomer || utangNewCustomerName);
+    const hasValidItem = utangItems.some(item => item.name.trim() && Number(item.amount) > 0);
+    const blockedByLimit = creditCheck.exceeds && !utangAddAnywayChecked;
+    document.getElementById('utangSaveBtn').disabled = !hasCustomer || !hasValidItem || blockedByLimit;
+  }
+
+  document.getElementById('addUtangBtn').addEventListener('click', () => {
+    resetUtangModal();
+    openModal('addUtangModal');
+  });
+  document.getElementById('utangCloseBtn').addEventListener('click', () => closeModal('addUtangModal'));
+
+  document.getElementById('utangCustomerInput').addEventListener('input', (e) => {
+    utangSelectedCustomer = null;
+    utangNewCustomerName = null;
+    document.getElementById('utangSelectedLine').classList.add('hidden');
+    renderCustomerDropdown(document.getElementById('utangCustomerDropdown'), e.target.value, customers, {allowNew: true});
+    renderUtangModal();
+  });
+  document.getElementById('utangCustomerInput').addEventListener('focus', (e) => {
+    renderCustomerDropdown(document.getElementById('utangCustomerDropdown'), e.target.value, customers, {allowNew: true});
+  });
+  document.getElementById('utangCustomerDropdown').addEventListener('click', (e) => {
+    const option = e.target.closest('.picker-option');
+    if (!option) return;
+    const line = document.getElementById('utangSelectedLine');
+    if (option.dataset.new !== undefined){
+      utangSelectedCustomer = null;
+      utangNewCustomerName = option.dataset.new;
+      document.getElementById('utangCustomerInput').value = utangNewCustomerName;
+      line.textContent = 'New customer — no utang yet';
+    } else {
+      utangSelectedCustomer = customers.find(c => c.id === option.dataset.id) || null;
+      utangNewCustomerName = null;
+      document.getElementById('utangCustomerInput').value = utangSelectedCustomer?.name || '';
+      const info = utangSelectedCustomer ? computeCustomerStatus(utangSelectedCustomer) : null;
+      line.textContent = info ? `Current: ${info.subtext} (${peso(info.total)})` : '';
+    }
+    line.classList.remove('hidden');
+    document.getElementById('utangCustomerDropdown').classList.add('hidden');
+    renderUtangModal();
+  });
+
+  document.getElementById('utangItemRows').addEventListener('input', (e) => {
+    const row = e.target.closest('.item-row');
+    if (!row) return;
+    const i = Number(row.dataset.index);
+    if (e.target.classList.contains('utang-item-name')) utangItems[i].name = e.target.value;
+    if (e.target.classList.contains('utang-item-amount')) utangItems[i].amount = e.target.value;
+    renderUtangModal();
+  });
+  document.getElementById('utangItemRows').addEventListener('click', (e) => {
+    if (e.target.dataset.remove === undefined) return;
+    const i = Number(e.target.dataset.remove);
+    if (utangItems.length > 1) utangItems.splice(i, 1);
+    else utangItems[0] = {name: '', amount: ''};
+    renderUtangItemRows();
+    renderUtangModal();
+  });
+  document.getElementById('utangAddItemBtn').addEventListener('click', () => {
+    utangItems.push({name: '', amount: ''});
+    renderUtangItemRows();
+    renderUtangModal();
+  });
+  document.getElementById('utangDueDate').addEventListener('change', renderUtangModal);
+  document.getElementById('utangAddAnyway').addEventListener('change', (e) => {
+    utangAddAnywayChecked = e.target.checked;
+    renderUtangModal();
+  });
+
+  document.getElementById('utangSaveBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+
+    const preSaveOverdueInfo = utangSelectedCustomer ? computeCustomerStatus(utangSelectedCustomer) : null;
+    const itemsTotal = utangItemsTotal();
+    const validItems = utangItems.filter(item => item.name.trim() && Number(item.amount) > 0)
+      .map(item => ({name: item.name.trim(), amount: round2(item.amount)}));
+    const dueDate = document.getElementById('utangDueDate').value || null;
+
+    let customerId = utangSelectedCustomer?.id;
+    let customerName = utangSelectedCustomer?.name;
+    let customerForCalc = utangCustomerForCalc();
+
+    if (!customerId){
+      customerName = utangNewCustomerName;
+      const {data, error} = await supabase.from('customers').insert({name: customerName}).select().single();
+      if (error){ showToast('Could not create customer'); console.error(error); return; }
+      customerId = data.id;
+      customerForCalc = data;
+    }
+
+    const totals = computeNewEntryTotals(customerForCalc, itemsTotal);
+
+    const {error: entryError} = await supabase.from('utang_entries').insert({
+      customer_id: customerId,
+      items: validItems,
+      total_amount: itemsTotal,
+      due_date: dueDate,
+      amount_remaining: totals.amountRemaining,
+      edited_history: []
+    });
+    if (entryError){ showToast('Could not save utang'); console.error(entryError); return; }
+
+    if (totals.storeCreditApplied > 0){
+      await supabase.from('customers').update({
+        store_credit_balance: round2((customerForCalc.store_credit_balance || 0) - totals.storeCreditApplied)
+      }).eq('id', customerId);
+    }
+
+    closeModal('addUtangModal');
+    await fetchCustomers();
+
+    renderReceiptModal({
+      modalTitle: 'Utang receipt',
+      storeName: STORE_NAME,
+      customerName,
+      dateLabel: formatDate(todayISO()),
+      rows: validItems.map(item => ({label: item.name, value: peso(item.amount)})),
+      subtotalLabel: 'This entry',
+      subtotalValue: peso(itemsTotal),
+      totalLabel: 'Total utang',
+      totalValue: peso(totals.newTotalUtang),
+      banners: [
+        ...(preSaveOverdueInfo && preSaveOverdueInfo.status === 'overdue'
+          ? [{status: 'overdue', text: `${peso(preSaveOverdueInfo.total)} already overdue — ${preSaveOverdueInfo.subtext}`}]
+          : []),
+        ...(dueDate ? [{status: 'active', text: `This entry due ${formatDate(dueDate)}`}] : [])
+      ]
+    });
+  });
+
+  // --- Add payment modal ---
+
+  let paymentSelectedCustomer = null;
+  let paymentOverpaymentAction = null;
+
+  function resetPaymentModal(){
+    paymentSelectedCustomer = null;
+    paymentOverpaymentAction = null;
+    document.getElementById('paymentCustomerInput').value = '';
+    document.getElementById('paymentAmount').value = '';
+    document.getElementById('paymentCustomerDropdown').classList.add('hidden');
+    document.getElementById('paymentCurrentTotalLine').classList.add('hidden');
+    document.querySelectorAll('input[name="overpaymentAction"]').forEach(r => r.checked = false);
+    renderPaymentModal();
+  }
+
+  function renderPaymentModal(){
+    const amountPaid = round2(document.getElementById('paymentAmount').value || 0);
+    const banner = document.getElementById('paymentOverpaidBanner');
+    let leftover = 0;
+
+    if (paymentSelectedCustomer){
+      const entries = getUnpaidEntriesOldestFirst(paymentSelectedCustomer);
+      const {allocations, leftover: lo} = simulateAllocation(entries, amountPaid);
+      leftover = lo;
+      const updatedCustomer = applyAllocationToCustomer(paymentSelectedCustomer, allocations);
+      const remaining = computeCustomerStatus(updatedCustomer).total;
+      document.getElementById('paymentRemainingTotal').textContent = peso(remaining);
+    } else {
+      document.getElementById('paymentRemainingTotal').textContent = peso(0);
+    }
+
+    if (leftover > 0){
+      document.getElementById('paymentOverpaidText').textContent = `This is ${peso(leftover)} more than the utang`;
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+      paymentOverpaymentAction = null;
+      document.querySelectorAll('input[name="overpaymentAction"]').forEach(r => r.checked = false);
+    }
+
+    const blockedByOverpayment = leftover > 0 && !paymentOverpaymentAction;
+    document.getElementById('paymentSaveBtn').disabled = !paymentSelectedCustomer || amountPaid <= 0 || blockedByOverpayment;
+  }
+
+  document.getElementById('addPaymentBtn').addEventListener('click', () => {
+    resetPaymentModal();
+    openModal('addPaymentModal');
+  });
+  document.getElementById('paymentCloseBtn').addEventListener('click', () => closeModal('addPaymentModal'));
+
+  document.getElementById('paymentCustomerInput').addEventListener('input', (e) => {
+    paymentSelectedCustomer = null;
+    document.getElementById('paymentCurrentTotalLine').classList.add('hidden');
+    renderCustomerDropdown(document.getElementById('paymentCustomerDropdown'), e.target.value, customers, {allowNew: false});
+    renderPaymentModal();
+  });
+  document.getElementById('paymentCustomerInput').addEventListener('focus', (e) => {
+    renderCustomerDropdown(document.getElementById('paymentCustomerDropdown'), e.target.value, customers, {allowNew: false});
+  });
+  document.getElementById('paymentCustomerDropdown').addEventListener('click', (e) => {
+    const option = e.target.closest('.picker-option');
+    if (!option || option.dataset.id === undefined) return;
+    paymentSelectedCustomer = customers.find(c => c.id === option.dataset.id) || null;
+    document.getElementById('paymentCustomerInput').value = paymentSelectedCustomer?.name || '';
+    const info = paymentSelectedCustomer ? computeCustomerStatus(paymentSelectedCustomer) : null;
+    const line = document.getElementById('paymentCurrentTotalLine');
+    line.textContent = info ? `Current total utang: ${peso(info.total)}` : '';
+    line.classList.remove('hidden');
+    document.getElementById('paymentCustomerDropdown').classList.add('hidden');
+    renderPaymentModal();
+  });
+
+  document.getElementById('paymentAmount').addEventListener('input', renderPaymentModal);
+  document.querySelectorAll('input[name="overpaymentAction"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      paymentOverpaymentAction = e.target.value;
+      renderPaymentModal();
+    });
+  });
+
+  document.getElementById('paymentSaveBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    if (!paymentSelectedCustomer) return;
+
+    const customer = paymentSelectedCustomer;
+    const amountPaid = round2(document.getElementById('paymentAmount').value || 0);
+    const entries = getUnpaidEntriesOldestFirst(customer);
+    const {allocations, leftover} = simulateAllocation(entries, amountPaid);
+
+    for (const {entry, appliedAmount} of allocations){
+      const newRemaining = round2(entry.amount_remaining - appliedAmount);
+      const {error: updateError} = await supabase.from('utang_entries')
+        .update({amount_remaining: newRemaining}).eq('id', entry.id);
+      if (updateError){ showToast('Could not update utang entry'); console.error(updateError); return; }
+
+      const {error: payError} = await supabase.from('payments').insert({
+        customer_id: customer.id,
+        utang_entry_id: entry.id,
+        amount: appliedAmount,
+        date: todayISO()
+      });
+      if (payError){ showToast('Could not record payment'); console.error(payError); return; }
+    }
+
+    if (leftover > 0){
+      const {error: overError} = await supabase.from('payments').insert({
+        customer_id: customer.id,
+        utang_entry_id: null,
+        amount: leftover,
+        date: todayISO(),
+        overpayment_amount: leftover,
+        overpayment_action: paymentOverpaymentAction
+      });
+      if (overError){ showToast('Could not record overpayment'); console.error(overError); return; }
+
+      if (paymentOverpaymentAction === 'store_credit'){
+        await supabase.from('customers').update({
+          store_credit_balance: round2((customer.store_credit_balance || 0) + leftover)
+        }).eq('id', customer.id);
+      }
+    }
+
+    const updatedCustomer = applyAllocationToCustomer(customer, allocations);
+    const remainingInfo = computeCustomerStatus(updatedCustomer);
+    const paidInFull = remainingInfo.total === 0;
+
+    // Note whether payment landed before/after the due date of the entries it cleared.
+    const clearedDueDates = allocations
+      .filter(a => round2(a.entry.amount_remaining - a.appliedAmount) === 0 && a.entry.due_date)
+      .map(a => a.entry.due_date)
+      .sort();
+    let timingNote = '';
+    if (clearedDueDates.length > 0){
+      const latestCleared = clearedDueDates[clearedDueDates.length - 1];
+      timingNote = todayISO() <= latestCleared ? ' (paid before due date)' : ' (paid after due date)';
+    }
+
+    closeModal('addPaymentModal');
+    await fetchCustomers();
+
+    renderReceiptModal({
+      modalTitle: 'Payment receipt',
+      storeName: STORE_NAME,
+      customerName: customer.name,
+      dateLabel: formatDate(todayISO()),
+      rows: [{label: 'Amount paid', value: peso(amountPaid)}],
+      subtotalLabel: 'Amount paid',
+      subtotalValue: peso(amountPaid),
+      totalLabel: 'Remaining balance',
+      totalValue: peso(remainingInfo.total),
+      banners: [
+        paidInFull
+          ? {status: 'paid', text: `Paid in full${timingNote}`}
+          : {status: remainingInfo.status, text: `${peso(remainingInfo.total)} still due — ${remainingInfo.subtext}`}
+      ]
+    });
+  });
+
+  // --- Receipt modal (shared) ---
+
+  let currentReceiptSpec = null;
+
+  function statusColor(status){
+    const cs = getComputedStyle(document.documentElement);
+    const map = {
+      overdue: {bg: cs.getPropertyValue('--overdue-bg').trim(), text: cs.getPropertyValue('--overdue-text').trim()},
+      active: {bg: cs.getPropertyValue('--active-bg').trim(), text: cs.getPropertyValue('--active-text').trim()},
+      paid: {bg: cs.getPropertyValue('--paid-bg').trim(), text: cs.getPropertyValue('--paid-text').trim()}
+    };
+    return map[status] || map.active;
+  }
+
+  function drawReceipt(canvas, spec){
+    const scale = 2;
+    const width = 380;
+    const padding = 20;
+    const bannerHeight = 44;
+    const rowHeight = 26;
+    let height = 150 + spec.banners.length * (bannerHeight + 10) + spec.rows.length * rowHeight + 90;
+
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, width, height);
+
+    let y = padding + 6;
+    ctx.fillStyle = '#2B2620';
+    ctx.font = '700 18px Poppins, sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.fillText(spec.storeName, padding, y);
+    y += 26;
+
+    ctx.font = '600 15px Poppins, sans-serif';
+    ctx.fillText(spec.customerName, padding, y);
+    y += 20;
+
+    ctx.font = '400 12px Poppins, sans-serif';
+    ctx.fillStyle = '#8A8378';
+    ctx.fillText(spec.dateLabel, padding, y);
+    y += 22;
+
+    ctx.strokeStyle = '#E8E4DB';
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(width - padding, y);
+    ctx.stroke();
+    y += 14;
+
+    for (const banner of spec.banners){
+      const colors = statusColor(banner.status);
+      ctx.fillStyle = colors.bg;
+      roundRect(ctx, padding, y, width - padding * 2, bannerHeight, 8);
+      ctx.fill();
+      ctx.fillStyle = colors.text;
+      ctx.font = '600 12px Poppins, sans-serif';
+      wrapText(ctx, banner.text, padding + 10, y + 14, width - padding * 2 - 20, 15);
+      y += bannerHeight + 10;
+    }
+
+    ctx.font = '400 13px Poppins, sans-serif';
+    for (const row of spec.rows){
+      ctx.fillStyle = '#2B2620';
+      ctx.textAlign = 'left';
+      ctx.fillText(row.label, padding, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(row.value, width - padding, y);
+      ctx.textAlign = 'left';
+      y += rowHeight;
+    }
+
+    y += 6;
+    ctx.strokeStyle = '#E8E4DB';
+    ctx.beginPath();
+    ctx.moveTo(padding, y);
+    ctx.lineTo(width - padding, y);
+    ctx.stroke();
+    y += 16;
+
+    ctx.font = '400 13px Poppins, sans-serif';
+    ctx.fillStyle = '#8A8378';
+    ctx.textAlign = 'left';
+    ctx.fillText(spec.subtotalLabel, padding, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(spec.subtotalValue, width - padding, y);
+    y += 24;
+
+    ctx.font = '700 17px Poppins, sans-serif';
+    ctx.fillStyle = '#2B2620';
+    ctx.textAlign = 'left';
+    ctx.fillText(spec.totalLabel, padding, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(spec.totalValue, width - padding, y);
+    ctx.textAlign = 'left';
+  }
+
+  function roundRect(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function wrapText(ctx, text, x, y, maxWidth, lineHeight){
+    const words = text.split(' ');
+    let line = '';
+    let lineY = y;
+    for (const word of words){
+      const testLine = line ? `${line} ${word}` : word;
+      if (ctx.measureText(testLine).width > maxWidth && line){
+        ctx.fillText(line, x, lineY);
+        line = word;
+        lineY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    if (line) ctx.fillText(line, x, lineY);
+  }
+
+  function renderReceiptModal(spec){
+    currentReceiptSpec = spec;
+    document.getElementById('receiptTitle').textContent = spec.modalTitle;
+    drawReceipt(document.getElementById('receiptCanvas'), spec);
+    openModal('receiptModal');
+  }
+
+  document.getElementById('receiptCloseBtn').addEventListener('click', () => closeModal('receiptModal'));
+
+  document.getElementById('receiptSaveBtn').addEventListener('click', () => {
+    const canvas = document.getElementById('receiptCanvas');
+    canvas.toBlob(blob => {
+      if (!blob){ showToast('Could not generate receipt image'); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `receipt-${slug(currentReceiptSpec?.customerName)}-${todayISO()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }, 'image/png');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.customer-picker')){
+      document.querySelectorAll('.picker-dropdown').forEach(d => d.classList.add('hidden'));
+    }
+  });
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -464,14 +1340,6 @@
 
   document.getElementById('newCustomerName').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addCustomer(e.target.value);
-  });
-
-  document.getElementById('addUtangBtn').addEventListener('click', () => {
-    showToast('Add utang is coming in the next stage');
-  });
-
-  document.getElementById('addPaymentBtn').addEventListener('click', () => {
-    showToast('Add payment is coming in the next stage');
   });
 
   document.getElementById('settingsBtn').addEventListener('click', () => {
