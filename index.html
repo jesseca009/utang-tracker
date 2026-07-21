@@ -878,10 +878,15 @@
 
 <script>
   // --- Fill these in from your Supabase project (Project Settings > API) ---
-  const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+  const SUPABASE_URL = 'https://uoetrucrflldxmpcrpag.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_hpmnluGoHzFK0A5wA8oz6Q_ZFWNYpB9';
 
-  const supabaseReady = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+  const credentialsFilled = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+  // window.supabase comes from the CDN <script> tag above — guard against it not
+  // having loaded yet (slow connection, ad-blocker, offline) so a network hiccup
+  // degrades to a toast instead of a silent, permanently blank page.
+  const cdnLoaded = typeof window.supabase !== 'undefined';
+  const supabaseReady = credentialsFilled && cdnLoaded;
   const supabase = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
   let STORE_NAME = 'My Store';
@@ -2110,8 +2115,14 @@
   }
 
   async function initAuth(){
-    if (!supabaseReady){
+    if (!credentialsFilled){
       showToast('Add your Supabase URL and key in index.html (see README)');
+      document.getElementById('appShell').classList.remove('hidden');
+      await fetchCustomers();
+      return;
+    }
+    if (!cdnLoaded){
+      showToast('Could not load the Supabase library — check your internet connection and reload');
       document.getElementById('appShell').classList.remove('hidden');
       await fetchCustomers();
       return;
@@ -2252,7 +2263,15 @@
     showAuthScreen();
   });
 
-  initAuth();
+  initAuth().catch(err => {
+    // Last-resort fallback: never leave the page permanently blank on an
+    // unexpected error (e.g. a network blip during getSession()).
+    console.error(err);
+    showToast('Something went wrong loading the app — check your connection and reload');
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('appShell').classList.remove('hidden');
+  });
 </script>
 
 </body>
