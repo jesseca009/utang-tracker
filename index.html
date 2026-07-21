@@ -887,7 +887,7 @@
   // degrades to a toast instead of a silent, permanently blank page.
   const cdnLoaded = typeof window.supabase !== 'undefined';
   const supabaseReady = credentialsFilled && cdnLoaded;
-  const supabase = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+  const supabaseClient = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
   let STORE_NAME = 'My Store';
   document.getElementById('storeNameLabel').textContent = STORE_NAME;
@@ -1010,7 +1010,7 @@
       renderAll();
       return;
     }
-    const {data, error} = await supabase
+    const {data, error} = await supabaseClient
       .from('customers')
       .select('*, utang_entries(*), payments(*)')
       .order('created_at', {ascending: true});
@@ -1032,7 +1032,7 @@
       showToast('Connect Supabase first (see README)');
       return;
     }
-    const {error} = await supabase.from('customers').insert({name: name.trim()});
+    const {error} = await supabaseClient.from('customers').insert({name: name.trim()});
     if (error){
       showToast('Could not add customer');
       console.error(error);
@@ -1297,7 +1297,7 @@
 
     if (!customerId){
       customerName = utangNewCustomerName;
-      const {data, error} = await supabase.from('customers').insert({name: customerName}).select().single();
+      const {data, error} = await supabaseClient.from('customers').insert({name: customerName}).select().single();
       if (error){ showToast('Could not create customer'); console.error(error); return; }
       customerId = data.id;
       customerForCalc = data;
@@ -1305,7 +1305,7 @@
 
     const totals = computeNewEntryTotals(customerForCalc, itemsTotal);
 
-    const {error: entryError} = await supabase.from('utang_entries').insert({
+    const {error: entryError} = await supabaseClient.from('utang_entries').insert({
       customer_id: customerId,
       items: validItems,
       total_amount: itemsTotal,
@@ -1316,7 +1316,7 @@
     if (entryError){ showToast('Could not save utang'); console.error(entryError); return; }
 
     if (totals.storeCreditApplied > 0){
-      await supabase.from('customers').update({
+      await supabaseClient.from('customers').update({
         store_credit_balance: round2((customerForCalc.store_credit_balance || 0) - totals.storeCreditApplied)
       }).eq('id', customerId);
     }
@@ -1435,11 +1435,11 @@
 
     for (const {entry, appliedAmount} of allocations){
       const newRemaining = round2(entry.amount_remaining - appliedAmount);
-      const {error: updateError} = await supabase.from('utang_entries')
+      const {error: updateError} = await supabaseClient.from('utang_entries')
         .update({amount_remaining: newRemaining}).eq('id', entry.id);
       if (updateError){ showToast('Could not update utang entry'); console.error(updateError); return; }
 
-      const {error: payError} = await supabase.from('payments').insert({
+      const {error: payError} = await supabaseClient.from('payments').insert({
         customer_id: customer.id,
         utang_entry_id: entry.id,
         amount: appliedAmount,
@@ -1449,7 +1449,7 @@
     }
 
     if (leftover > 0){
-      const {error: overError} = await supabase.from('payments').insert({
+      const {error: overError} = await supabaseClient.from('payments').insert({
         customer_id: customer.id,
         utang_entry_id: null,
         amount: leftover,
@@ -1460,7 +1460,7 @@
       if (overError){ showToast('Could not record overpayment'); console.error(overError); return; }
 
       if (paymentOverpaymentAction === 'store_credit'){
-        await supabase.from('customers').update({
+        await supabaseClient.from('customers').update({
           store_credit_balance: round2((customer.store_credit_balance || 0) + leftover)
         }).eq('id', customer.id);
       }
@@ -1942,7 +1942,7 @@
       newHistory = [...newHistory, {old_value: entry.total_amount, new_value: newTotal, edited_at: new Date().toISOString()}];
     }
 
-    const {error} = await supabase.from('utang_entries').update({
+    const {error} = await supabaseClient.from('utang_entries').update({
       items: validItems,
       total_amount: newTotal,
       due_date: dueDate,
@@ -1963,7 +1963,7 @@
     const message = `${itemsText} (${peso(entry.total_amount)} total) will be removed from ${detailCustomer.name}'s utang`;
     openConfirm(message, async () => {
       if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
-      const {error} = await supabase.from('utang_entries').delete().eq('id', entry.id);
+      const {error} = await supabaseClient.from('utang_entries').delete().eq('id', entry.id);
       if (error){ showToast('Could not delete entry'); console.error(error); return; }
       await fetchCustomers();
       refreshDetailCustomer();
@@ -2003,7 +2003,7 @@
     const creditLimit = creditLimitRaw === '' ? null : round2(creditLimitRaw);
     const overdueBehavior = document.querySelector('input[name="overdueBehavior"]:checked')?.value || 'warn';
 
-    const {error} = await supabase.from('customers').update({
+    const {error} = await supabaseClient.from('customers').update({
       payment_term: paymentTerm,
       credit_limit: creditLimit,
       overdue_behavior: overdueBehavior
@@ -2127,7 +2127,7 @@
       await fetchCustomers();
       return;
     }
-    const {data: {session}} = await supabase.auth.getSession();
+    const {data: {session}} = await supabaseClient.auth.getSession();
     if (!session){
       showAuthScreen();
       return;
@@ -2159,7 +2159,7 @@
     const password = document.getElementById('signupPassword').value;
     if (!storeName || !email || !password){ showToast('Fill in all fields'); return; }
 
-    const {data, error} = await supabase.auth.signUp({
+    const {data, error} = await supabaseClient.auth.signUp({
       email, password, options: {data: {store_name: storeName}}
     });
     if (error){ showToast(error.message); console.error(error); return; }
@@ -2180,7 +2180,7 @@
     const password = document.getElementById('loginPassword').value;
     if (!email || !password){ showToast('Enter email and password'); return; }
 
-    const {data, error} = await supabase.auth.signInWithPassword({email, password});
+    const {data, error} = await supabaseClient.auth.signInWithPassword({email, password});
     if (error){ showToast(error.message); console.error(error); return; }
 
     currentUser = data.user;
@@ -2204,7 +2204,7 @@
 
   document.getElementById('pinForgotLink').addEventListener('click', async (e) => {
     e.preventDefault();
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     currentUser = null;
     showAuthScreen();
   });
@@ -2238,7 +2238,7 @@
     if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
     const newName = document.getElementById('globalStoreName').value.trim();
     if (!newName){ showToast('Store name cannot be empty'); return; }
-    const {error} = await supabase.auth.updateUser({data: {store_name: newName}});
+    const {error} = await supabaseClient.auth.updateUser({data: {store_name: newName}});
     if (error){ showToast('Could not update store name'); console.error(error); return; }
     STORE_NAME = newName;
     if (currentUser) currentUser.user_metadata = {...currentUser.user_metadata, store_name: newName};
@@ -2257,7 +2257,7 @@
   });
 
   document.getElementById('logoutBtn').addEventListener('click', async () => {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
     currentUser = null;
     closeModal('globalSettingsModal');
     showAuthScreen();
