@@ -500,17 +500,6 @@
   #authScreen a, #pinScreen a{color:var(--accent);font-weight:600;text-decoration:none;}
   #authScreen a:hover, #pinScreen a:hover{text-decoration:underline;}
 
-  .receipt-preview-strip{
-    background:var(--bg);
-    border:1px dashed var(--border);
-    border-radius:10px;
-    padding:12px 14px;
-    margin:10px 0 4px;
-    text-align:center;
-  }
-  .receipt-preview-label{font-size:0.72rem;color:var(--muted);margin-bottom:4px;}
-  .receipt-preview-name{font-size:1.1rem;font-weight:700;font-family:'Poppins',sans-serif;}
-
   .pin-input{
     text-align:center;
     font-size:1.6rem;
@@ -595,15 +584,9 @@
 <div id="storeNameScreen" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
   <div style="width:100%;max-width:380px;">
     <div style="text-align:center;margin-bottom:24px;">
-      <div class="brand-name" style="font-size:1.25rem;">What's your store or your name?</div>
-      <div style="font-size:0.85rem;color:var(--muted);margin-top:6px;">This appears on every receipt</div>
+      <div class="brand-name" style="font-size:1.25rem;">What's your store name?</div>
     </div>
-    <label class="field-label" for="onboardStoreNameInput">Store or owner name</label>
-    <input type="text" id="onboardStoreNameInput" class="form-input" placeholder="e.g. Aling Nena's Store">
-    <div class="receipt-preview-strip">
-      <div class="receipt-preview-label">How this looks on a receipt</div>
-      <div class="receipt-preview-name" id="onboardReceiptPreviewName">Your store name</div>
-    </div>
+    <input type="text" id="onboardStoreNameInput" class="form-input" placeholder="Input here">
     <button class="btn-primary" id="storeNameContinueBtn" style="width:100%;margin-top:16px;">Continue</button>
   </div>
 </div>
@@ -2115,7 +2098,6 @@
     hideAllTopLevelScreens();
     document.getElementById('storeNameScreen').classList.remove('hidden');
     document.getElementById('onboardStoreNameInput').value = '';
-    document.getElementById('onboardReceiptPreviewName').textContent = 'Your store name';
   }
 
   function showWelcomeScreen(){
@@ -2235,10 +2217,6 @@
     if (error){ showToast(error.message); console.error(error); return; }
 
     await proceedAfterAuth(data.user);
-  });
-
-  document.getElementById('onboardStoreNameInput').addEventListener('input', (e) => {
-    document.getElementById('onboardReceiptPreviewName').textContent = e.target.value.trim() || 'Your store name';
   });
 
   document.getElementById('storeNameContinueBtn').addEventListener('click', async () => {
