@@ -435,22 +435,20 @@
     padding:12px 14px;
     box-shadow:var(--shadow);
     margin-bottom:10px;
-    border-left:6px solid var(--border);
+    background:var(--card-bg);
+    color:var(--text);
   }
-  .entry-card.status-overdue{border-left-color:var(--overdue-bg);background:var(--card-bg);color:var(--text);}
-  .entry-card.status-active{border-left-color:var(--active-bg);background:var(--card-bg);color:var(--text);}
-  .entry-card.status-paid{border-left-color:var(--paid-bg);background:var(--card-bg);color:var(--text);}
-  .entry-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
   .entry-items{font-size:0.88rem;}
   .entry-items div{padding:1px 0;}
-  .entry-meta{font-size:0.78rem;color:var(--muted);margin-top:6px;}
-  .entry-pill{
-    font-size:0.72rem;
-    font-weight:700;
-    padding:3px 9px;
-    border-radius:999px;
-    white-space:nowrap;
+  .entry-meta-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+    margin-top:6px;
   }
+  .entry-meta-left{font-size:0.78rem;color:var(--muted);}
+  .entry-meta-right{font-size:0.72rem;color:var(--muted);white-space:nowrap;}
   .entry-edited-note{font-size:0.72rem;color:var(--muted);font-style:italic;margin-top:6px;}
   .entry-actions{display:flex;gap:8px;margin-top:10px;}
   .entry-actions button{
@@ -474,9 +472,6 @@
     background:var(--bg);
     font-size:0.85rem;
   }
-  .timeline-label{display:flex;flex-direction:column;gap:2px;}
-  .timeline-date{font-size:0.72rem;color:var(--muted);}
-  .timeline-amount-positive{color:var(--overdue-bg);font-weight:700;white-space:nowrap;}
   .timeline-amount-negative{color:var(--paid-text);font-weight:700;white-space:nowrap;}
 
   .footer-note{
@@ -1770,37 +1765,13 @@
   // --- Stage 3: pure helpers ---
 
   // Per-entry status (distinct from computeCustomerStatus, which is worst-status across a customer).
-  function computeEntryStatus(entry){
-    const remaining = Number(entry.amount_remaining);
-    if (remaining <= 0){
-      return {status: 'paid', subtext: 'Paid'};
-    }
-    if (entry.due_date){
-      const days = daysBetween(new Date(entry.due_date + 'T00:00:00'), new Date());
-      if (days > 0){
-        return {status: 'overdue', subtext: `${days} day${days === 1 ? '' : 's'} overdue`};
-      }
-      return {status: 'active', subtext: `Due ${formatDate(entry.due_date)}`};
-    }
-    return {status: 'active', subtext: 'No due date set'};
-  }
-
+  // Payment history only -- utang-added events are already shown in the
+  // Entries section above, no need to duplicate them here.
   function buildCustomerTimeline(customer){
-    const entryEvents = (customer.utang_entries || []).map(e => ({
-      date: e.created_at,
-      label: `Utang added: ${(e.items || []).map(i => i.name).join(', ') || 'items'}`,
-      amount: e.total_amount,
-      sign: '+'
-    }));
-    const paymentEvents = (customer.payments || []).map(p => ({
-      date: p.date,
-      label: p.overpayment_action === 'store_credit' ? 'Payment (extra kept as store credit)'
-        : p.overpayment_action === 'change_given' ? 'Payment (extra given as change)'
-        : 'Payment received',
-      amount: p.amount,
-      sign: '-'
-    }));
-    return [...entryEvents, ...paymentEvents].sort((a, b) => new Date(b.date) - new Date(a.date));
+    return (customer.payments || [])
+      .slice()
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      .map(p => ({date: p.date, amount: p.amount}));
   }
 
   function computeMonthlyTotals(allCustomers, year, month){
@@ -1854,9 +1825,16 @@
     renderDetailTimeline();
   }
 
+  // Soonest due date first (overdue counts as "soonest" since its due_date
+  // is furthest in the past) -- entries with no due date sort to the bottom.
   function renderDetailEntries(){
     const entries = (detailCustomer.utang_entries || []).slice()
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      .sort((a, b) => {
+        if (!a.due_date && !b.due_date) return new Date(b.created_at) - new Date(a.created_at);
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return new Date(a.due_date) - new Date(b.due_date);
+      });
     const container = document.getElementById('detailEntries');
 
     if (entries.length === 0){
@@ -1865,19 +1843,23 @@
     }
 
     container.innerHTML = entries.map(entry => {
-      const info = computeEntryStatus(entry);
       const itemsHtml = (entry.items || []).map(i => `<div>${escapeHtml(i.name)} — ${peso(i.amount)}</div>`).join('');
       const editedNote = (entry.edited_history && entry.edited_history.length > 0)
         ? `<div class="entry-edited-note">Originally ${peso(entry.edited_history[0].old_value)} · added ${formatDate(String(entry.created_at).slice(0, 10))}</div>`
         : '';
-      const dueLine = entry.due_date ? ` · Due ${formatDate(entry.due_date)}` : '';
+      const createdDate = formatDate(String(entry.created_at).slice(0, 10));
+      const remainingDiffers = round2(entry.amount_remaining) !== round2(entry.total_amount);
+      const leftText = remainingDiffers
+        ? `${peso(entry.total_amount)} total · ${peso(entry.amount_remaining)} remaining · ${createdDate}`
+        : `${peso(entry.total_amount)} total · ${createdDate}`;
+      const dueText = entry.due_date ? `Due ${formatDate(entry.due_date)}` : '';
       return `
-        <div class="entry-card status-${info.status}">
-          <div class="entry-top">
-            <div class="entry-items">${itemsHtml}</div>
-            <div class="entry-pill status-${info.status}">${info.subtext}</div>
+        <div class="entry-card">
+          <div class="entry-items">${itemsHtml}</div>
+          <div class="entry-meta-row">
+            <div class="entry-meta-left">${leftText}</div>
+            <div class="entry-meta-right">${dueText}</div>
           </div>
-          <div class="entry-meta">Total ${peso(entry.total_amount)} · Remaining ${peso(entry.amount_remaining)}${dueLine}</div>
           ${editedNote}
           <div class="entry-actions">
             <button class="entry-edit-btn" data-edit-id="${entry.id}">Edit</button>
@@ -1893,17 +1875,14 @@
     const container = document.getElementById('detailTimeline');
 
     if (events.length === 0){
-      container.innerHTML = '<div class="empty-state">No activity yet.</div>';
+      container.innerHTML = '<div class="empty-state">No payments received yet</div>';
       return;
     }
 
     container.innerHTML = events.map(ev => `
       <div class="timeline-item">
-        <div class="timeline-label">
-          <span>${escapeHtml(ev.label)}</span>
-          <span class="timeline-date">${formatDate(String(ev.date).slice(0, 10))}</span>
-        </div>
-        <div class="${ev.sign === '+' ? 'timeline-amount-positive' : 'timeline-amount-negative'}">${ev.sign}${peso(ev.amount)}</div>
+        <span>${formatDate(String(ev.date).slice(0, 10))}</span>
+        <span class="timeline-amount-negative">-${peso(ev.amount)}</span>
       </div>
     `).join('');
   }
@@ -2218,9 +2197,14 @@
     currentUser = user;
     if (!currentUser.user_metadata?.store_name){
       showStoreNameScreen();
-    } else {
-      showPinScreen('setup');
+      return;
     }
+    // Same check initAuth() does on page load -- a returning user who
+    // already has a PIN saved for this device should go straight to PIN
+    // entry, not be sent through setup again just because they logged in
+    // with email/password (e.g. after "Log in with email instead").
+    const savedHash = localStorage.getItem(pinHashKey(currentUser.id));
+    showPinScreen(savedHash ? 'entry' : 'setup');
   }
 
   function showPinScreen(mode, allowCancel){
