@@ -1059,6 +1059,22 @@
     return (str || 'customer').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   }
 
+  // One shared, atomically-incrementing counter per store account (see
+  // migration_v5_receipt_numbers.sql) -- an utang entry and a payment both
+  // consume the next number, regardless of which customer they belong to.
+  async function nextReceiptNumber(){
+    const {data, error} = await supabaseClient.rpc('next_receipt_number');
+    if (error){
+      console.error(error);
+      return null;
+    }
+    return data;
+  }
+
+  function formatReceiptNumber(n){
+    return (n === null || n === undefined) ? '' : '#' + String(n).padStart(5, '0');
+  }
+
   // FIFO order: oldest incurred debt first.
   function getUnpaidEntriesOldestFirst(customer){
     return (customer?.utang_entries || [])
@@ -1305,6 +1321,7 @@
     }
 
     const totals = computeNewEntryTotals(customerForCalc, itemsTotal);
+    const receiptNumber = await nextReceiptNumber();
 
     const {error: entryError} = await supabaseClient.from('utang_entries').insert({
       customer_id: customerId,
@@ -1312,7 +1329,8 @@
       total_amount: itemsTotal,
       due_date: dueDate,
       amount_remaining: totals.amountRemaining,
-      edited_history: []
+      edited_history: [],
+      receipt_number: receiptNumber
     });
     if (entryError){ showToast('Could not save utang'); console.error(entryError); return; }
 
@@ -1327,14 +1345,18 @@
 
     renderReceiptModal({
       modalTitle: 'Utang receipt',
+      receiptTypeLabel: 'UTANG RECEIPT',
+      receiptNumber,
       storeName: STORE_NAME,
       customerName,
       dateLabel: formatDate(todayISO()),
       rows: validItems.map(item => ({label: item.name, value: peso(item.amount)})),
-      subtotalLabel: 'This entry',
+      showItemHeader: true,
+      subtotalLabel: 'Subtotal',
       subtotalValue: peso(itemsTotal),
       totalLabel: 'Total utang',
       totalValue: peso(totals.newTotalUtang),
+      footerText: 'Please settle on or before the due date',
       banners: [
         ...(preSaveOverdueInfo && preSaveOverdueInfo.status === 'overdue'
           ? [{status: 'overdue', text: `${peso(preSaveOverdueInfo.total)} already overdue — ${preSaveOverdueInfo.subtext}`}]
@@ -1433,6 +1455,10 @@
     const amountPaid = round2(document.getElementById('paymentAmount').value || 0);
     const entries = getUnpaidEntriesOldestFirst(customer);
     const {allocations, leftover} = simulateAllocation(entries, amountPaid);
+    // One receipt number for the whole payment action, even though it may
+    // write multiple payments rows (one per FIFO-allocated entry, plus an
+    // overpayment row) -- the user only ever sees one receipt for this.
+    const receiptNumber = await nextReceiptNumber();
 
     for (const {entry, appliedAmount} of allocations){
       const newRemaining = round2(entry.amount_remaining - appliedAmount);
@@ -1444,7 +1470,8 @@
         customer_id: customer.id,
         utang_entry_id: entry.id,
         amount: appliedAmount,
-        date: todayISO()
+        date: todayISO(),
+        receipt_number: receiptNumber
       });
       if (payError){ showToast('Could not record payment'); console.error(payError); return; }
     }
@@ -1456,7 +1483,8 @@
         amount: leftover,
         date: todayISO(),
         overpayment_amount: leftover,
-        overpayment_action: paymentOverpaymentAction
+        overpayment_action: paymentOverpaymentAction,
+        receipt_number: receiptNumber
       });
       if (overError){ showToast('Could not record overpayment'); console.error(overError); return; }
 
@@ -1487,14 +1515,18 @@
 
     renderReceiptModal({
       modalTitle: 'Payment receipt',
+      receiptTypeLabel: 'PAYMENT RECEIPT',
+      receiptNumber,
       storeName: STORE_NAME,
       customerName: customer.name,
       dateLabel: formatDate(todayISO()),
-      rows: [{label: 'Amount paid', value: peso(amountPaid)}],
+      rows: [],
+      showItemHeader: false,
       subtotalLabel: 'Amount paid',
       subtotalValue: peso(amountPaid),
       totalLabel: 'Remaining balance',
       totalValue: peso(remainingInfo.total),
+      footerText: null,
       banners: [
         paidInFull
           ? {status: 'paid', text: `Paid in full${timingNote}`}
@@ -1517,13 +1549,55 @@
     return map[status] || map.active;
   }
 
+  const RECEIPT_SANS = 'Poppins, sans-serif';
+  const RECEIPT_MONO = 'ui-monospace, "SF Mono", Consolas, monospace';
+  const RECEIPT_MUTED = '#8A8378';
+  const RECEIPT_TEXT = '#2B2620';
+  const RECEIPT_BORDER = '#E8E4DB';
+
+  function dashedDivider(ctx, x1, x2, y){
+    ctx.save();
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = RECEIPT_BORDER;
+    ctx.beginPath();
+    ctx.moveTo(x1, y);
+    ctx.lineTo(x2, y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Canvas has no letter-spacing property, so this draws char-by-char with
+  // a fixed gap between glyphs, respecting the current ctx.font/fillStyle.
+  function drawLetterSpacedText(ctx, text, x, y, spacing, align){
+    const chars = text.split('');
+    const widths = chars.map(c => ctx.measureText(c).width);
+    const totalWidth = widths.reduce((sum, w) => sum + w, 0) + spacing * (chars.length - 1);
+    let cursorX = align === 'right' ? x - totalWidth : align === 'center' ? x - totalWidth / 2 : x;
+    for (let i = 0; i < chars.length; i++){
+      ctx.fillText(chars[i], cursorX, y);
+      cursorX += widths[i] + spacing;
+    }
+  }
+
   function drawReceipt(canvas, spec){
     const scale = 2;
     const width = 380;
     const padding = 20;
     const bannerHeight = 44;
+    const bannerGap = 10;
     const rowHeight = 26;
-    let height = 150 + spec.banners.length * (bannerHeight + 10) + spec.rows.length * rowHeight + 90;
+    const infoRowHeight = 18;
+
+    const headerHeight = 26 + 18 + 14;
+    const infoBlockHeight = infoRowHeight * 3 + 8 + 14;
+    const bannersHeight = spec.banners.length * (bannerHeight + bannerGap);
+    const columnHeaderHeight = spec.showItemHeader ? 24 : 0;
+    const rowsHeight = spec.rows.length * rowHeight;
+    const totalsHeight = 6 + 16 + 24 + 28;
+    const footerBlockHeight = spec.footerText ? 32 : 0;
+
+    const height = padding + 6 + headerHeight + infoBlockHeight + bannersHeight
+      + columnHeaderHeight + rowsHeight + totalsHeight + footerBlockHeight + padding;
 
     canvas.width = width * scale;
     canvas.height = height * scale;
@@ -1534,74 +1608,108 @@
 
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, width, height);
+    ctx.textBaseline = 'top';
 
     let y = padding + 6;
-    ctx.fillStyle = '#2B2620';
-    ctx.font = '700 18px Poppins, sans-serif';
-    ctx.textBaseline = 'top';
+
+    // Store name — sans-serif, stays the one "branded" element on the page.
+    ctx.fillStyle = RECEIPT_TEXT;
+    ctx.font = `700 18px ${RECEIPT_SANS}`;
+    ctx.textAlign = 'left';
     ctx.fillText(spec.storeName, padding, y);
     y += 26;
 
-    ctx.font = '600 15px Poppins, sans-serif';
-    ctx.fillText(spec.customerName, padding, y);
-    y += 20;
+    // Receipt type label — uppercase, letter-spaced, muted.
+    ctx.fillStyle = RECEIPT_MUTED;
+    ctx.font = `600 10px ${RECEIPT_SANS}`;
+    drawLetterSpacedText(ctx, spec.receiptTypeLabel, padding, y, 1.5, 'left');
+    y += 18;
 
-    ctx.font = '400 12px Poppins, sans-serif';
-    ctx.fillStyle = '#8A8378';
-    ctx.fillText(spec.dateLabel, padding, y);
-    y += 22;
-
-    ctx.strokeStyle = '#E8E4DB';
-    ctx.beginPath();
-    ctx.moveTo(padding, y);
-    ctx.lineTo(width - padding, y);
-    ctx.stroke();
+    dashedDivider(ctx, padding, width - padding, y);
     y += 14;
 
+    // Info block: Receipt No. / Date / Customer — labeled pairs, monospace.
+    const infoRows = [
+      {label: 'Receipt No.', value: formatReceiptNumber(spec.receiptNumber)},
+      {label: 'Date', value: spec.dateLabel},
+      {label: 'Customer', value: spec.customerName}
+    ];
+    ctx.font = `400 12px ${RECEIPT_MONO}`;
+    for (const info of infoRows){
+      ctx.fillStyle = RECEIPT_MUTED;
+      ctx.textAlign = 'left';
+      ctx.fillText(info.label, padding, y);
+      ctx.fillStyle = RECEIPT_TEXT;
+      ctx.textAlign = 'right';
+      ctx.fillText(info.value, width - padding, y);
+      y += infoRowHeight;
+    }
+    y += 8;
+
+    dashedDivider(ctx, padding, width - padding, y);
+    y += 14;
+
+    // Status banners — unchanged: solid fill, sans-serif, exactly as before.
     for (const banner of spec.banners){
       const colors = statusColor(banner.status);
       ctx.fillStyle = colors.bg;
       roundRect(ctx, padding, y, width - padding * 2, bannerHeight, 8);
       ctx.fill();
       ctx.fillStyle = colors.text;
-      ctx.font = '600 12px Poppins, sans-serif';
+      ctx.font = `600 12px ${RECEIPT_SANS}`;
       wrapText(ctx, banner.text, padding + 10, y + 14, width - padding * 2 - 20, 15);
-      y += bannerHeight + 10;
+      y += bannerHeight + bannerGap;
     }
 
-    ctx.font = '400 13px Poppins, sans-serif';
+    // Column headers, itemized receipts only (utang; payment has no item list).
+    if (spec.showItemHeader){
+      ctx.fillStyle = RECEIPT_MUTED;
+      ctx.font = `600 10px ${RECEIPT_MONO}`;
+      ctx.textAlign = 'left';
+      drawLetterSpacedText(ctx, 'ITEM', padding, y, 1, 'left');
+      drawLetterSpacedText(ctx, 'AMOUNT', width - padding, y, 1, 'right');
+      y += 24;
+    }
+
+    ctx.font = `400 13px ${RECEIPT_MONO}`;
     for (const row of spec.rows){
-      ctx.fillStyle = '#2B2620';
+      ctx.fillStyle = RECEIPT_TEXT;
       ctx.textAlign = 'left';
       ctx.fillText(row.label, padding, y);
       ctx.textAlign = 'right';
       ctx.fillText(row.value, width - padding, y);
-      ctx.textAlign = 'left';
       y += rowHeight;
     }
 
     y += 6;
-    ctx.strokeStyle = '#E8E4DB';
-    ctx.beginPath();
-    ctx.moveTo(padding, y);
-    ctx.lineTo(width - padding, y);
-    ctx.stroke();
+    dashedDivider(ctx, padding, width - padding, y);
     y += 16;
 
-    ctx.font = '400 13px Poppins, sans-serif';
-    ctx.fillStyle = '#8A8378';
+    ctx.font = `400 13px ${RECEIPT_MONO}`;
+    ctx.fillStyle = RECEIPT_MUTED;
     ctx.textAlign = 'left';
     ctx.fillText(spec.subtotalLabel, padding, y);
     ctx.textAlign = 'right';
     ctx.fillText(spec.subtotalValue, width - padding, y);
     y += 24;
 
-    ctx.font = '700 17px Poppins, sans-serif';
-    ctx.fillStyle = '#2B2620';
+    ctx.font = `700 17px ${RECEIPT_MONO}`;
+    ctx.fillStyle = RECEIPT_TEXT;
     ctx.textAlign = 'left';
     ctx.fillText(spec.totalLabel, padding, y);
     ctx.textAlign = 'right';
     ctx.fillText(spec.totalValue, width - padding, y);
+    y += 28;
+
+    if (spec.footerText){
+      dashedDivider(ctx, padding, width - padding, y);
+      y += 16;
+      ctx.font = `400 11px ${RECEIPT_SANS}`;
+      ctx.fillStyle = RECEIPT_MUTED;
+      ctx.textAlign = 'center';
+      ctx.fillText(spec.footerText, width / 2, y);
+    }
+
     ctx.textAlign = 'left';
   }
 
