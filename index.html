@@ -931,7 +931,7 @@
     const total = entries.reduce((sum, e) => sum + Number(e.amount_remaining), 0);
 
     if (entries.length === 0){
-      return {status: 'paid', subtext: 'No utang', total, sortDays: -Infinity};
+      return {status: 'paid', subtext: 'No utang', total, sortDays: -Infinity, dueDate: null};
     }
 
     const today = new Date();
@@ -942,15 +942,15 @@
 
     if (overdue.length > 0){
       const days = daysBetween(new Date(overdue[0].due_date + 'T00:00:00'), new Date());
-      return {status: 'overdue', subtext: `${days} day${days === 1 ? '' : 's'} overdue`, total, sortDays: days};
+      return {status: 'overdue', subtext: `${days} day${days === 1 ? '' : 's'} overdue`, total, sortDays: days, dueDate: overdue[0].due_date};
     }
 
     const upcoming = withDueDates.sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
     if (upcoming.length > 0){
-      return {status: 'active', subtext: `Utang due ${formatDate(upcoming[0].due_date)}`, total, sortDays: 0};
+      return {status: 'active', subtext: `Utang due ${formatDate(upcoming[0].due_date)}`, total, sortDays: 0, dueDate: upcoming[0].due_date};
     }
 
-    return {status: 'active', subtext: 'Has active utang', total, sortDays: 0};
+    return {status: 'active', subtext: 'Has active utang', total, sortDays: 0, dueDate: null};
   }
 
   function sortCustomers(list, mode){
@@ -1360,12 +1360,11 @@
       subtotalValue: peso(itemsTotal),
       totalLabel: 'Total utang',
       totalValue: peso(totals.newTotalUtang),
-      footerText: 'Please settle on or before the due date',
+      footerText: dueDate ? `Please settle on or before ${formatDate(dueDate)}` : 'Please settle as soon as possible',
       banners: [
         ...(preSaveOverdueInfo && preSaveOverdueInfo.status === 'overdue'
           ? [{status: 'overdue', text: `${peso(preSaveOverdueInfo.total)} already overdue — ${preSaveOverdueInfo.subtext}`}]
-          : []),
-        ...(dueDate ? [{status: 'active', text: `This entry due ${formatDate(dueDate)}`}] : [])
+          : [])
       ]
     });
   });
@@ -1503,16 +1502,11 @@
     const remainingInfo = computeCustomerStatus(updatedCustomer);
     const paidInFull = remainingInfo.total === 0;
 
-    // Note whether payment landed before/after the due date of the entries it cleared.
-    const clearedDueDates = allocations
-      .filter(a => round2(a.entry.amount_remaining - a.appliedAmount) === 0 && a.entry.due_date)
-      .map(a => a.entry.due_date)
-      .sort();
-    let timingNote = '';
-    if (clearedDueDates.length > 0){
-      const latestCleared = clearedDueDates[clearedDueDates.length - 1];
-      timingNote = todayISO() <= latestCleared ? ' (paid before due date)' : ' (paid after due date)';
-    }
+    const footerText = paidInFull
+      ? 'Paid in full — Thank you!'
+      : (remainingInfo.dueDate
+          ? `Please settle on or before ${formatDate(remainingInfo.dueDate)}`
+          : 'Please settle as soon as possible');
 
     closeModal('addPaymentModal');
     await fetchCustomers();
@@ -1530,12 +1524,8 @@
       subtotalValue: peso(amountPaid),
       totalLabel: 'Remaining balance',
       totalValue: peso(remainingInfo.total),
-      footerText: null,
-      banners: [
-        paidInFull
-          ? {status: 'paid', text: `Paid in full${timingNote}`}
-          : {status: remainingInfo.status, text: `${peso(remainingInfo.total)} still due — ${remainingInfo.subtext}`}
-      ]
+      footerText,
+      banners: []
     });
   });
 
@@ -1619,15 +1609,17 @@
     // Store name — sans-serif, stays the one "branded" element on the page.
     ctx.fillStyle = RECEIPT_TEXT;
     ctx.font = `700 18px ${RECEIPT_SANS}`;
-    ctx.textAlign = 'left';
-    ctx.fillText(spec.storeName, padding, y);
+    ctx.textAlign = 'center';
+    ctx.fillText(spec.storeName, width / 2, y);
     y += 26;
 
     // Receipt type label — uppercase, letter-spaced, muted.
     ctx.fillStyle = RECEIPT_MUTED;
     ctx.font = `600 10px ${RECEIPT_SANS}`;
-    drawLetterSpacedText(ctx, spec.receiptTypeLabel, padding, y, 1.5, 'left');
+    drawLetterSpacedText(ctx, spec.receiptTypeLabel, width / 2, y, 1.5, 'center');
     y += 18;
+
+    ctx.textAlign = 'left';
 
     dashedDivider(ctx, padding, width - padding, y);
     y += 14;
