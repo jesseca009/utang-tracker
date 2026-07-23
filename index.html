@@ -1781,14 +1781,14 @@
     dashedDivider(ctx, padding, width - padding, y);
     y += 14;
 
-    // Status banners — unchanged: solid fill, sans-serif, exactly as before.
+    // Status banners — solid fill, monospace to match the info block above.
     for (const banner of spec.banners){
       const colors = statusColor(banner.status);
       ctx.fillStyle = colors.bg;
       roundRect(ctx, padding, y, width - padding * 2, bannerHeight, 8);
       ctx.fill();
       ctx.fillStyle = colors.text;
-      ctx.font = `600 12px ${RECEIPT_SANS}`;
+      ctx.font = `600 12px ${RECEIPT_MONO}`;
       wrapText(ctx, banner.text, padding + 10, y + 14, width - padding * 2 - 20, 15);
       y += bannerHeight + bannerGap;
     }
