@@ -421,8 +421,9 @@
   .detail-header.status-active{background:var(--active-bg);color:var(--active-text);}
   .detail-header.status-paid{background:var(--paid-bg);color:var(--paid-text);}
   .detail-header-name{font-size:1.3rem;font-weight:700;}
-  .detail-header-sub{font-size:0.88rem;margin-top:2px;opacity:0.9;}
-  .detail-header-total{font-size:1.8rem;font-weight:700;margin-top:10px;}
+  .detail-header-stats{display:flex;gap:28px;margin-top:12px;}
+  .detail-header-stat-label{font-size:0.78rem;opacity:0.85;}
+  .detail-header-stat-value{font-size:1.5rem;font-weight:700;margin-top:2px;}
 
   .detail-actions{
     display:flex;
@@ -489,6 +490,8 @@
     background:var(--bg);
     font-size:0.85rem;
   }
+  .timeline-label{display:flex;flex-direction:column;gap:2px;}
+  .timeline-date{font-size:0.72rem;color:var(--muted);}
   .timeline-amount-negative{color:var(--paid-text);font-weight:700;white-space:nowrap;}
 
   .footer-note{
@@ -753,10 +756,18 @@
 <div class="modal-overlay hidden" id="customerDetailModal">
   <div class="modal-sheet">
     <div class="modal-header detail-header status-paid" id="detailHeader">
-      <div>
+      <div style="width:100%;">
         <div class="detail-header-name" id="detailName"></div>
-        <div class="detail-header-sub" id="detailSub"></div>
-        <div class="detail-header-total" id="detailTotal"></div>
+        <div class="detail-header-stats">
+          <div>
+            <div class="detail-header-stat-label">Total utang</div>
+            <div class="detail-header-stat-value" id="detailTotalValue"></div>
+          </div>
+          <div class="hidden" id="detailDueStat">
+            <div class="detail-header-stat-label" id="detailDueLabel"></div>
+            <div class="detail-header-stat-value" id="detailDueValue"></div>
+          </div>
+        </div>
       </div>
       <button class="modal-close" id="detailCloseBtn">&times;</button>
     </div>
@@ -968,6 +979,22 @@
     return {status: 'active', subtext: 'Has active utang', total, sortDays: 0, dueDate: null};
   }
 
+  // Two-stat header breakdown: total across all unpaid entries, and the
+  // portion of that total sharing the single earliest due date (the "due
+  // soonest" number) -- entries with no due date, or a later one, are
+  // excluded from dueTotal but still count toward total.
+  function computeHeaderStats(customer){
+    const unpaid = (customer.utang_entries || []).filter(e => Number(e.amount_remaining) > 0);
+    const total = round2(unpaid.reduce((sum, e) => sum + Number(e.amount_remaining), 0));
+    const withDueDates = unpaid.filter(e => e.due_date);
+    if (withDueDates.length === 0){
+      return {total, dueDate: null, dueTotal: 0};
+    }
+    const earliestDueDate = withDueDates.reduce((min, e) => e.due_date < min ? e.due_date : min, withDueDates[0].due_date);
+    const dueTotal = round2(withDueDates.filter(e => e.due_date === earliestDueDate).reduce((sum, e) => sum + Number(e.amount_remaining), 0));
+    return {total, dueDate: earliestDueDate, dueTotal};
+  }
+
   function sortCustomers(list, mode){
     const withStatus = list.map(c => ({customer: c, info: computeCustomerStatus(c)}));
     if (mode === 'owed'){
@@ -1092,6 +1119,18 @@
 
   function formatReceiptNumber(n){
     return (n === null || n === undefined) ? '' : '#' + String(n).padStart(5, '0');
+  }
+
+  // Per-customer, atomically-incrementing entry number (see
+  // migration_v6_entry_numbers.sql) -- permanent once assigned, never
+  // reused or renumbered even if earlier entries are edited or deleted.
+  async function nextEntryNumber(customerId){
+    const {data, error} = await supabaseClient.rpc('next_entry_number', {p_customer_id: customerId});
+    if (error){
+      console.error(error);
+      return null;
+    }
+    return data;
   }
 
   // FIFO order: oldest incurred debt first.
@@ -1341,6 +1380,7 @@
 
     const totals = computeNewEntryTotals(customerForCalc, itemsTotal);
     const receiptNumber = await nextReceiptNumber();
+    const entryNumber = await nextEntryNumber(customerId);
 
     const {error: entryError} = await supabaseClient.from('utang_entries').insert({
       customer_id: customerId,
@@ -1349,7 +1389,8 @@
       due_date: dueDate,
       amount_remaining: totals.amountRemaining,
       edited_history: [],
-      receipt_number: receiptNumber
+      receipt_number: receiptNumber,
+      entry_number: entryNumber
     });
     if (entryError){ showToast('Could not save utang'); console.error(entryError); return; }
 
@@ -1489,7 +1530,8 @@
         utang_entry_id: entry.id,
         amount: appliedAmount,
         date: todayISO(),
-        receipt_number: receiptNumber
+        receipt_number: receiptNumber,
+        is_full_payment: newRemaining === 0
       });
       if (payError){ showToast('Could not record payment'); console.error(payError); return; }
     }
@@ -1525,8 +1567,8 @@
 
     // Itemization rule: exactly one entry touched -> show its actual items,
     // same as an utang receipt. Two or more -> list which entries (FIFO
-    // order) the payment applied to instead, since individual items from
-    // several different entries would be confusing to show together.
+    // order) the payment applied to instead, worded the same way as the
+    // payment history rows ("Entry #X * paid in full/partial").
     const touchedEntries = allocations.map(a => a.entry);
     let receiptRows = [];
     let receiptShowItemHeader = false;
@@ -1538,10 +1580,10 @@
       receiptColumnHeaderLeft = 'APPLIED TO';
       receiptShowItemHeader = true;
       receiptRows = allocations.map(({entry, appliedAmount}) => {
-        const label = (entry.items && entry.items.length > 0)
-          ? `Entry · ${formatDate(String(entry.created_at).slice(0, 10))}`
-          : 'Existing balance';
-        return {label, value: peso(appliedAmount)};
+        const numberLabel = entry.entry_number ? `Entry #${entry.entry_number}` : 'Entry';
+        const newRemaining = round2(entry.amount_remaining - appliedAmount);
+        const statusWord = newRemaining === 0 ? 'paid in full' : 'paid partial';
+        return {label: `${numberLabel} · ${statusWord}`, value: peso(appliedAmount)};
       });
     }
 
@@ -1810,11 +1852,30 @@
   // Per-entry status (distinct from computeCustomerStatus, which is worst-status across a customer).
   // Payment history only -- utang-added events are already shown in the
   // Entries section above, no need to duplicate them here.
+  // One row per payment row already means one row per entry touched, since
+  // a FIFO-split payment writes one payments row per entry it applied to
+  // (see paymentSaveBtn) -- this just labels each row against its entry.
   function buildCustomerTimeline(customer){
+    const entryById = new Map((customer.utang_entries || []).map(e => [e.id, e]));
     return (customer.payments || [])
       .slice()
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .map(p => ({date: p.date, amount: p.amount}));
+      .map(p => {
+        const entry = p.utang_entry_id ? entryById.get(p.utang_entry_id) : null;
+        if (entry){
+          const numberLabel = entry.entry_number ? `Entry #${entry.entry_number}` : 'Entry';
+          const dueLabel = entry.due_date ? ` · due ${formatDate(entry.due_date)}` : '';
+          const statusWord = p.is_full_payment === true ? 'Paid in full for'
+            : p.is_full_payment === false ? 'Paid partial for'
+            : 'Payment for';
+          return {primary: `${statusWord} ${numberLabel}${dueLabel}`, date: p.date, amount: p.amount};
+        }
+        // Overpayment/leftover portion -- not tied to a specific entry.
+        const label = p.overpayment_action === 'store_credit' ? 'Kept as store credit'
+          : p.overpayment_action === 'change_given' ? 'Given as change'
+          : 'Payment received';
+        return {primary: label, date: p.date, amount: p.amount};
+      });
   }
 
   function computeMonthlyTotals(allCustomers, year, month){
@@ -1860,18 +1921,31 @@
 
   function renderCustomerDetail(){
     const info = computeCustomerStatus(detailCustomer);
+    const stats = computeHeaderStats(detailCustomer);
     document.getElementById('detailHeader').className = `modal-header detail-header status-${info.status}`;
     document.getElementById('detailName').textContent = detailCustomer.name;
-    document.getElementById('detailSub').textContent = info.subtext;
-    document.getElementById('detailTotal').textContent = peso(info.total);
+    document.getElementById('detailTotalValue').textContent = peso(stats.total);
+
+    const dueStat = document.getElementById('detailDueStat');
+    if (stats.dueDate){
+      document.getElementById('detailDueLabel').textContent = `Due ${formatDate(stats.dueDate)}`;
+      document.getElementById('detailDueValue').textContent = peso(stats.dueTotal);
+      dueStat.classList.remove('hidden');
+    } else {
+      dueStat.classList.add('hidden');
+    }
+
     renderDetailEntries();
     renderDetailTimeline();
   }
 
   // Soonest due date first (overdue counts as "soonest" since its due_date
   // is furthest in the past) -- entries with no due date sort to the bottom.
+  // Fully-paid entries are dropped entirely; their payment record still
+  // lives permanently in Payment History below.
   function renderDetailEntries(){
-    const entries = (detailCustomer.utang_entries || []).slice()
+    const entries = (detailCustomer.utang_entries || [])
+      .filter(e => Number(e.amount_remaining) > 0)
       .sort((a, b) => {
         if (!a.due_date && !b.due_date) return new Date(b.created_at) - new Date(a.created_at);
         if (!a.due_date) return 1;
@@ -1881,7 +1955,7 @@
     const container = document.getElementById('detailEntries');
 
     if (entries.length === 0){
-      container.innerHTML = '<div class="empty-state">No utang entries yet.</div>';
+      container.innerHTML = '<div class="empty-state">No unpaid utang entries.</div>';
       return;
     }
 
@@ -1891,10 +1965,8 @@
         ? `<div class="entry-edited-note">Originally ${peso(entry.edited_history[0].old_value)} · added ${formatDate(String(entry.created_at).slice(0, 10))}</div>`
         : '';
       const createdDate = formatDate(String(entry.created_at).slice(0, 10));
-      const remainingDiffers = round2(entry.amount_remaining) !== round2(entry.total_amount);
-      const leftText = remainingDiffers
-        ? `${peso(entry.total_amount)} total · ${peso(entry.amount_remaining)} remaining · ${createdDate}`
-        : `${peso(entry.total_amount)} total · ${createdDate}`;
+      const numberPrefix = entry.entry_number ? `Entry #${entry.entry_number} · ` : '';
+      const leftText = `${numberPrefix}${peso(entry.total_amount)} total · ${createdDate}`;
       const dueText = entry.due_date ? `Due ${formatDate(entry.due_date)}` : '';
       return `
         <div class="entry-card">
@@ -1924,7 +1996,10 @@
 
     container.innerHTML = events.map(ev => `
       <div class="timeline-item">
-        <span>${formatDate(String(ev.date).slice(0, 10))}</span>
+        <div class="timeline-label">
+          <span>${escapeHtml(ev.primary)}</span>
+          <span class="timeline-date">${formatDate(String(ev.date).slice(0, 10))}</span>
+        </div>
         <span class="timeline-amount-negative">-${peso(ev.amount)}</span>
       </div>
     `).join('');
