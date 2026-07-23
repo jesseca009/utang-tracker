@@ -421,9 +421,10 @@
   .detail-header.status-active{background:var(--active-bg);color:var(--active-text);}
   .detail-header.status-paid{background:var(--paid-bg);color:var(--paid-text);}
   .detail-header-name{font-size:1.3rem;font-weight:700;}
-  .detail-header-stats{display:flex;gap:28px;margin-top:12px;}
+  .detail-header-stats{display:flex;justify-content:space-between;align-items:flex-end;margin-top:12px;}
   .detail-header-stat-label{font-size:0.78rem;opacity:0.85;}
-  .detail-header-stat-value{font-size:1.5rem;font-weight:700;margin-top:2px;}
+  .detail-header-total-value{font-size:2rem;font-weight:700;margin-top:2px;}
+  .detail-header-due-value{font-size:1rem;font-weight:700;margin-top:2px;}
 
   .detail-actions{
     display:flex;
@@ -492,7 +493,34 @@
   }
   .timeline-label{display:flex;flex-direction:column;gap:2px;}
   .timeline-date{font-size:0.72rem;color:var(--muted);}
-  .timeline-amount-negative{color:var(--paid-text);font-weight:700;white-space:nowrap;}
+  .timeline-amount-success{color:var(--paid-text);font-weight:700;white-space:nowrap;}
+  .timeline-right{display:flex;align-items:center;gap:10px;}
+
+  .collapsible-toggle{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    width:100%;
+    background:transparent;
+    border:none;
+    padding:0;
+    font-size:0.95rem;
+    font-weight:700;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .collapsible-chevron{transition:transform 0.15s ease;display:inline-block;}
+  .collapsible-chevron.expanded{transform:rotate(180deg);}
+  .undo-btn{
+    background:transparent;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:5px 10px;
+    font-size:0.75rem;
+    font-weight:600;
+    color:var(--text);
+    white-space:nowrap;
+  }
 
   .footer-note{
     text-align:center;
@@ -761,11 +789,11 @@
         <div class="detail-header-stats">
           <div>
             <div class="detail-header-stat-label">Total utang</div>
-            <div class="detail-header-stat-value" id="detailTotalValue"></div>
+            <div class="detail-header-total-value" id="detailTotalValue"></div>
           </div>
-          <div class="hidden" id="detailDueStat">
+          <div class="hidden" id="detailDueStat" style="text-align:right;">
             <div class="detail-header-stat-label" id="detailDueLabel"></div>
-            <div class="detail-header-stat-value" id="detailDueValue"></div>
+            <div class="detail-header-due-value" id="detailDueValue"></div>
           </div>
         </div>
       </div>
@@ -790,7 +818,32 @@
       <div class="timeline-list" id="detailTimeline"></div>
     </div>
 
+    <div class="detail-section">
+      <button class="collapsible-toggle" id="recentlySettledToggle">
+        <span>Recently settled</span>
+        <span class="collapsible-chevron" id="recentlySettledChevron">&#9662;</span>
+      </button>
+      <div class="hidden timeline-list" id="recentlySettledContent" style="margin-top:10px;"></div>
+    </div>
+
     <div class="footer-note">Payments apply to the oldest entry first</div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="editPaymentModal">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h3>Edit payment</h3>
+      <button class="modal-close" id="editPaymentCloseBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="selected-customer-line" id="editPaymentContext" style="margin-top:0;"></div>
+      <label class="field-label" for="editPaymentAmount">Amount applied to this entry</label>
+      <input type="number" id="editPaymentAmount" class="form-input" min="0" step="0.01">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="editPaymentSaveBtn">Save changes</button>
+    </div>
   </div>
 </div>
 
@@ -1256,7 +1309,7 @@
     const isBlockedByOverdue = !!(overdueInfo && overdueInfo.status === 'overdue' && utangSelectedCustomer?.overdue_behavior === 'block');
 
     const existingBalanceBox = document.getElementById('utangExistingBalanceBox');
-    if (hasCustomer){
+    if (hasCustomer && totals.existingUnpaidTotal > 0){
       document.getElementById('utangExistingBalanceValue').textContent = peso(totals.existingUnpaidTotal);
       existingBalanceBox.classList.remove('hidden');
     } else {
@@ -1412,8 +1465,10 @@
       dateLabel: formatDate(todayISO()),
       rows: validItems.map(item => ({label: item.name, value: peso(item.amount)})),
       showItemHeader: true,
-      subtotalLabel: 'Subtotal',
+      subtotalLabel: 'Subtotal (this entry)',
       subtotalValue: peso(itemsTotal),
+      middleLabel: totals.existingUnpaidTotal > 0 ? 'Previous balance' : null,
+      middleValue: totals.existingUnpaidTotal > 0 ? peso(totals.existingUnpaidTotal) : null,
       totalLabel: 'Total utang',
       totalValue: peso(totals.newTotalUtang),
       footerText: dueDate ? `Please settle on or before ${formatDate(dueDate)}` : 'Please settle as soon as possible',
@@ -1667,7 +1722,8 @@
     const bannersHeight = spec.banners.length * (bannerHeight + bannerGap);
     const columnHeaderHeight = spec.showItemHeader ? 24 : 0;
     const rowsHeight = spec.rows.length * rowHeight;
-    const totalsHeight = 6 + 16 + 24 + 28;
+    const middleLineHeight = spec.middleLabel ? 24 : 0;
+    const totalsHeight = 6 + 16 + 24 + middleLineHeight + 28;
     const footerBlockHeight = spec.footerText ? 32 : 0;
 
     const height = padding + 6 + headerHeight + infoBlockHeight + bannersHeight
@@ -1770,6 +1826,18 @@
     ctx.fillText(spec.subtotalValue, width - padding, y);
     y += 24;
 
+    // Optional middle line -- e.g. "Previous balance" on an utang receipt,
+    // shown only when there was a non-zero balance before this entry.
+    if (spec.middleLabel){
+      ctx.font = `400 13px ${RECEIPT_MONO}`;
+      ctx.fillStyle = RECEIPT_MUTED;
+      ctx.textAlign = 'left';
+      ctx.fillText(spec.middleLabel, padding, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(spec.middleValue, width - padding, y);
+      y += 24;
+    }
+
     ctx.font = `700 17px ${RECEIPT_MONO}`;
     ctx.fillStyle = RECEIPT_TEXT;
     ctx.textAlign = 'left';
@@ -1868,13 +1936,14 @@
           const statusWord = p.is_full_payment === true ? 'Paid in full for'
             : p.is_full_payment === false ? 'Paid partial for'
             : 'Payment for';
-          return {primary: `${statusWord} ${numberLabel}${dueLabel}`, date: p.date, amount: p.amount};
+          return {primary: `${statusWord} ${numberLabel}${dueLabel}`, date: p.date, amount: p.amount, paymentId: p.id, entryId: entry.id};
         }
-        // Overpayment/leftover portion -- not tied to a specific entry.
+        // Overpayment/leftover portion -- not tied to a specific entry, so
+        // there's nothing for the "Recently settled" Undo button to edit.
         const label = p.overpayment_action === 'store_credit' ? 'Kept as store credit'
           : p.overpayment_action === 'change_given' ? 'Given as change'
           : 'Payment received';
-        return {primary: label, date: p.date, amount: p.amount};
+        return {primary: label, date: p.date, amount: p.amount, paymentId: p.id, entryId: null};
       });
   }
 
@@ -1937,6 +2006,7 @@
 
     renderDetailEntries();
     renderDetailTimeline();
+    renderRecentlySettled();
   }
 
   // Soonest due date first (overdue counts as "soonest" since its due_date
@@ -2000,10 +2070,90 @@
           <span>${escapeHtml(ev.primary)}</span>
           <span class="timeline-date">${formatDate(String(ev.date).slice(0, 10))}</span>
         </div>
-        <span class="timeline-amount-negative">-${peso(ev.amount)}</span>
+        <span class="timeline-amount-success">${peso(ev.amount)}</span>
       </div>
     `).join('');
   }
+
+  // Same underlying rows as Payment history, just capped at 5 and with an
+  // Undo (edit) action -- a quick safety net for correcting a recent
+  // mistake without having to scroll through the full history.
+  function renderRecentlySettled(){
+    const events = buildCustomerTimeline(detailCustomer).slice(0, 5);
+    const container = document.getElementById('recentlySettledContent');
+
+    if (events.length === 0){
+      container.innerHTML = '<div class="empty-state">No payments received yet</div>';
+      return;
+    }
+
+    container.innerHTML = events.map(ev => `
+      <div class="timeline-item">
+        <div class="timeline-label">
+          <span>${escapeHtml(ev.primary)}</span>
+          <span class="timeline-date">${formatDate(String(ev.date).slice(0, 10))}</span>
+        </div>
+        <div class="timeline-right">
+          <span class="timeline-amount-success">${peso(ev.amount)}</span>
+          ${ev.entryId ? `<button class="undo-btn" data-payment-id="${ev.paymentId}">Undo</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('recentlySettledToggle').addEventListener('click', () => {
+    document.getElementById('recentlySettledContent').classList.toggle('hidden');
+    document.getElementById('recentlySettledChevron').classList.toggle('expanded');
+  });
+
+  let editPaymentTarget = null;
+
+  function openEditPayment(payment, entry){
+    editPaymentTarget = {payment, entry};
+    const numberLabel = entry.entry_number ? `Entry #${entry.entry_number}` : 'Entry';
+    const dueLabel = entry.due_date ? ` · due ${formatDate(entry.due_date)}` : '';
+    document.getElementById('editPaymentContext').textContent =
+      `${numberLabel}${dueLabel} — paid ${formatDate(String(payment.date).slice(0, 10))}`;
+    document.getElementById('editPaymentAmount').value = payment.amount;
+    openModal('editPaymentModal');
+  }
+
+  document.getElementById('recentlySettledContent').addEventListener('click', (e) => {
+    const btn = e.target.closest('.undo-btn');
+    if (!btn) return;
+    const payment = (detailCustomer.payments || []).find(p => p.id === btn.dataset.paymentId);
+    if (!payment) return;
+    const entry = (detailCustomer.utang_entries || []).find(en => en.id === payment.utang_entry_id);
+    if (!entry) return;
+    openEditPayment(payment, entry);
+  });
+
+  document.getElementById('editPaymentCloseBtn').addEventListener('click', () => closeModal('editPaymentModal'));
+
+  document.getElementById('editPaymentSaveBtn').addEventListener('click', async () => {
+    if (!supabaseReady){ showToast('Connect Supabase first (see README)'); return; }
+    if (!editPaymentTarget) return;
+    const {payment, entry} = editPaymentTarget;
+    const newAmount = round2(document.getElementById('editPaymentAmount').value || 0);
+    if (newAmount <= 0){ showToast('Enter a valid amount'); return; }
+
+    // Reverse the old applied amount, then apply the corrected one --
+    // works whether the correction is larger or smaller than the original.
+    const correctedRemaining = Math.max(0, round2(entry.amount_remaining + payment.amount - newAmount));
+
+    const {error: entryError} = await supabaseClient.from('utang_entries')
+      .update({amount_remaining: correctedRemaining}).eq('id', entry.id);
+    if (entryError){ showToast('Could not update entry'); console.error(entryError); return; }
+
+    const {error: payError} = await supabaseClient.from('payments')
+      .update({amount: newAmount, is_full_payment: correctedRemaining === 0}).eq('id', payment.id);
+    if (payError){ showToast('Could not update payment'); console.error(payError); return; }
+
+    closeModal('editPaymentModal');
+    await fetchCustomers();
+    refreshDetailCustomer();
+    showToast('Payment updated');
+  });
 
   document.getElementById('customerList').addEventListener('click', (e) => {
     const card = e.target.closest('.customer-card');
