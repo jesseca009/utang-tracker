@@ -30,6 +30,14 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button{
+    -webkit-appearance:none;
+    margin:0;
+  }
+  input[type="number"]{
+    -moz-appearance:textfield;
+  }
   body{
     font-family:'Poppins',sans-serif;
     background:var(--bg);
@@ -306,6 +314,15 @@
     color:var(--muted);
     margin-top:6px;
   }
+
+  .existing-balance-box{
+    background:var(--bg);
+    border-radius:10px;
+    padding:10px 14px;
+    margin-top:10px;
+  }
+  .existing-balance-label{font-size:0.78rem;color:var(--muted);}
+  .existing-balance-value{font-size:1.1rem;font-weight:700;margin-top:2px;}
 
   .banner{
     border-radius:10px;
@@ -669,7 +686,10 @@
         <input type="text" id="utangCustomerInput" class="form-input" placeholder="Search or type a new name" autocomplete="off">
         <div class="picker-dropdown hidden" id="utangCustomerDropdown"></div>
       </div>
-      <div class="selected-customer-line hidden" id="utangSelectedLine"></div>
+      <div class="existing-balance-box hidden" id="utangExistingBalanceBox">
+        <div class="existing-balance-label">Existing balance</div>
+        <div class="existing-balance-value" id="utangExistingBalanceValue">₱ 0</div>
+      </div>
 
       <div id="utangOverdueBanner" class="banner banner-overdue hidden"></div>
       <div id="utangOverLimitBanner" class="banner banner-overlimit hidden">
@@ -686,8 +706,7 @@
       <input type="date" id="utangDueDate" class="form-input">
 
       <div class="totals-box">
-        <div class="totals-line"><span>This entry</span><span id="utangThisEntryTotal">₱ 0</span></div>
-        <div class="totals-line totals-line-strong"><span>New total utang</span><span id="utangNewTotal">₱ 0</span></div>
+        <div class="totals-line totals-line-strong"><span>This entry</span><span id="utangThisEntryTotal">₱ 0</span></div>
       </div>
     </div>
     <div class="modal-actions">
@@ -1168,7 +1187,6 @@
     document.getElementById('utangCustomerInput').value = '';
     document.getElementById('utangDueDate').value = '';
     document.getElementById('utangCustomerDropdown').classList.add('hidden');
-    document.getElementById('utangSelectedLine').classList.add('hidden');
     renderUtangItemRows();
     renderUtangModal();
   }
@@ -1194,8 +1212,17 @@
     const totals = computeNewEntryTotals(customer, itemsTotal);
     const creditCheck = checkCreditLimit(customer, totals.newTotalUtang);
     const overdueInfo = utangSelectedCustomer ? computeCustomerStatus(utangSelectedCustomer) : null;
+    const hasCustomer = !!(utangSelectedCustomer || utangNewCustomerName);
 
     const isBlockedByOverdue = !!(overdueInfo && overdueInfo.status === 'overdue' && utangSelectedCustomer?.overdue_behavior === 'block');
+
+    const existingBalanceBox = document.getElementById('utangExistingBalanceBox');
+    if (hasCustomer){
+      document.getElementById('utangExistingBalanceValue').textContent = peso(totals.existingUnpaidTotal);
+      existingBalanceBox.classList.remove('hidden');
+    } else {
+      existingBalanceBox.classList.add('hidden');
+    }
 
     const overdueBanner = document.getElementById('utangOverdueBanner');
     if (overdueInfo && overdueInfo.status === 'overdue'){
@@ -1210,7 +1237,7 @@
     const overLimitBanner = document.getElementById('utangOverLimitBanner');
     if (creditCheck.exceeds){
       document.getElementById('utangOverLimitText').textContent =
-        `This would bring total utang to ${peso(totals.newTotalUtang)}, over the ${peso(creditCheck.limit)} credit limit.`;
+        `Limit: ${peso(creditCheck.limit)} · Existing: ${peso(totals.existingUnpaidTotal)} + This entry: ${peso(itemsTotal)} = ${peso(totals.newTotalUtang)}`;
       overLimitBanner.classList.remove('hidden');
     } else {
       overLimitBanner.classList.add('hidden');
@@ -1227,9 +1254,7 @@
     }
 
     document.getElementById('utangThisEntryTotal').textContent = peso(itemsTotal);
-    document.getElementById('utangNewTotal').textContent = peso(totals.newTotalUtang);
 
-    const hasCustomer = !!(utangSelectedCustomer || utangNewCustomerName);
     const hasValidItem = utangItems.some(item => item.name.trim() && Number(item.amount) > 0);
     const blockedByLimit = creditCheck.exceeds && !utangAddAnywayChecked;
     document.getElementById('utangSaveBtn').disabled = !hasCustomer || !hasValidItem || blockedByLimit || isBlockedByOverdue;
@@ -1244,7 +1269,6 @@
   document.getElementById('utangCustomerInput').addEventListener('input', (e) => {
     utangSelectedCustomer = null;
     utangNewCustomerName = null;
-    document.getElementById('utangSelectedLine').classList.add('hidden');
     renderCustomerDropdown(document.getElementById('utangCustomerDropdown'), e.target.value, customers, {allowNew: true});
     renderUtangModal();
   });
@@ -1254,20 +1278,15 @@
   document.getElementById('utangCustomerDropdown').addEventListener('click', (e) => {
     const option = e.target.closest('.picker-option');
     if (!option) return;
-    const line = document.getElementById('utangSelectedLine');
     if (option.dataset.new !== undefined){
       utangSelectedCustomer = null;
       utangNewCustomerName = option.dataset.new;
       document.getElementById('utangCustomerInput').value = utangNewCustomerName;
-      line.textContent = 'New customer — no utang yet';
     } else {
       utangSelectedCustomer = customers.find(c => c.id === option.dataset.id) || null;
       utangNewCustomerName = null;
       document.getElementById('utangCustomerInput').value = utangSelectedCustomer?.name || '';
-      const info = utangSelectedCustomer ? computeCustomerStatus(utangSelectedCustomer) : null;
-      line.textContent = info ? `Current: ${info.subtext} (${peso(info.total)})` : '';
     }
-    line.classList.remove('hidden');
     document.getElementById('utangCustomerDropdown').classList.add('hidden');
     renderUtangModal();
   });
@@ -1504,6 +1523,28 @@
           ? `Please settle on or before ${formatDate(remainingInfo.dueDate)}`
           : 'Please settle as soon as possible');
 
+    // Itemization rule: exactly one entry touched -> show its actual items,
+    // same as an utang receipt. Two or more -> list which entries (FIFO
+    // order) the payment applied to instead, since individual items from
+    // several different entries would be confusing to show together.
+    const touchedEntries = allocations.map(a => a.entry);
+    let receiptRows = [];
+    let receiptShowItemHeader = false;
+    let receiptColumnHeaderLeft = 'ITEM';
+    if (touchedEntries.length === 1){
+      receiptRows = (touchedEntries[0].items || []).map(item => ({label: item.name, value: peso(item.amount)}));
+      receiptShowItemHeader = receiptRows.length > 0;
+    } else if (touchedEntries.length >= 2){
+      receiptColumnHeaderLeft = 'APPLIED TO';
+      receiptShowItemHeader = true;
+      receiptRows = allocations.map(({entry, appliedAmount}) => {
+        const label = (entry.items && entry.items.length > 0)
+          ? `Entry · ${formatDate(String(entry.created_at).slice(0, 10))}`
+          : 'Existing balance';
+        return {label, value: peso(appliedAmount)};
+      });
+    }
+
     closeModal('addPaymentModal');
     await fetchCustomers();
 
@@ -1514,8 +1555,9 @@
       storeName: STORE_NAME,
       customerName: customer.name,
       dateLabel: formatDate(todayISO()),
-      rows: [],
-      showItemHeader: false,
+      rows: receiptRows,
+      showItemHeader: receiptShowItemHeader,
+      columnHeaderLeft: receiptColumnHeaderLeft,
       subtotalLabel: 'Amount paid',
       subtotalValue: peso(amountPaid),
       totalLabel: 'Remaining balance',
@@ -1653,13 +1695,14 @@
       y += bannerHeight + bannerGap;
     }
 
-    // Column headers, itemized receipts only (utang; payment has no item list).
+    // Column headers -- "ITEM"/"AMOUNT" for an itemized entry, or
+    // "APPLIED TO"/"AMOUNT" when a payment spans multiple entries.
     if (spec.showItemHeader){
       ctx.fillStyle = RECEIPT_MUTED;
       ctx.font = `600 10px ${RECEIPT_MONO}`;
       ctx.textAlign = 'left';
-      drawLetterSpacedText(ctx, 'ITEM', padding, y, 1, 'left');
-      drawLetterSpacedText(ctx, 'AMOUNT', width - padding, y, 1, 'right');
+      drawLetterSpacedText(ctx, spec.columnHeaderLeft || 'ITEM', padding, y, 1, 'left');
+      drawLetterSpacedText(ctx, spec.columnHeaderRight || 'AMOUNT', width - padding, y, 1, 'right');
       y += 24;
     }
 
@@ -1906,10 +1949,6 @@
     resetUtangModal();
     utangSelectedCustomer = customer;
     document.getElementById('utangCustomerInput').value = customer.name;
-    const info = computeCustomerStatus(customer);
-    const line = document.getElementById('utangSelectedLine');
-    line.textContent = `Current: ${info.subtext} (${peso(info.total)})`;
-    line.classList.remove('hidden');
     renderUtangModal();
     openModal('addUtangModal');
   }
