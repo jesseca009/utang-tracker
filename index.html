@@ -960,6 +960,31 @@
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="limitBlockedModal">
+  <div class="modal-sheet" style="border-radius:18px;max-width:400px;">
+    <div class="modal-body" style="padding:28px 20px 20px;text-align:center;">
+      <div style="font-size:2.2rem;margin-bottom:10px;">&#128274;</div>
+      <h3 style="margin:0 0 10px;">You've reached your free limit</h3>
+      <div style="font-size:0.9rem;color:var(--muted);line-height:1.5;margin-bottom:16px;">Free accounts can track up to 7 customers. Upgrade to add unlimited customers and keep using everything you've already built.</div>
+      <div style="font-weight:700;font-size:1.1rem;margin-bottom:20px;" id="limitBlockedStat">7 / 7</div>
+      <button class="btn-primary" id="limitBlockedUpgradeBtn" style="width:100%;">Upgrade — &#8369;99/month</button>
+      <button class="btn-secondary" id="limitBlockedNotNowBtn" style="width:100%;margin-top:10px;">Not now</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="upgradeModal">
+  <div class="modal-sheet" style="border-radius:18px;max-width:400px;">
+    <div class="modal-body" style="padding:28px 20px 20px;text-align:center;">
+      <div style="font-size:2.2rem;margin-bottom:10px;">&#128274;</div>
+      <h3 style="margin:0 0 10px;">You've reached your free limit</h3>
+      <div style="font-size:0.9rem;color:var(--muted);line-height:1.5;margin-bottom:20px;">Free accounts can track up to 7 customers. Message the Tech Sari page to learn about upgrading and unlocking unlimited customers.</div>
+      <button class="btn-primary" id="messageTechSariBtn" style="width:100%;">Message Tech Sari</button>
+      <button class="btn-secondary" id="upgradeNotNowBtn" style="width:100%;margin-top:10px;">Not now</button>
+    </div>
+  </div>
+</div>
+
 <script>
   // --- Fill these in from your Supabase project (Project Settings > API) ---
   const SUPABASE_URL = 'https://uoetrucrflldxmpcrpag.supabase.co';
@@ -978,6 +1003,8 @@
 
   let customers = [];
   let archivedCustomers = [];
+  let isProAccount = false;
+  const FREE_CUSTOMER_LIMIT = 7;
   let currentSort = 'owed';
 
   function showToast(msg){
@@ -1126,10 +1153,42 @@
     renderAll();
   }
 
+  async function fetchProAccountStatus(){
+    if (!supabaseReady || !currentUser){
+      isProAccount = false;
+      return;
+    }
+    const {data, error} = await supabaseClient
+      .from('profiles')
+      .select('is_pro')
+      .eq('id', currentUser.id)
+      .single();
+    if (error){
+      console.error(error);
+      isProAccount = false;
+      return;
+    }
+    isProAccount = !!data?.is_pro;
+  }
+
+  function canAddNewCustomer(){
+    return isProAccount || customers.length < FREE_CUSTOMER_LIMIT;
+  }
+
+  function showLimitBlockedModal(){
+    document.getElementById('limitBlockedStat').textContent = `${customers.length} / ${FREE_CUSTOMER_LIMIT}`;
+    openModal('limitBlockedModal');
+  }
+
   async function addCustomer(name){
     if (!name.trim()) return;
     if (!supabaseReady){
       showToast('Connect Supabase first (see README)');
+      return;
+    }
+    if (!canAddNewCustomer()){
+      document.getElementById('newCustomerForm').classList.add('hidden');
+      showLimitBlockedModal();
       return;
     }
     const {error} = await supabaseClient.from('customers').insert({name: name.trim()});
@@ -1304,7 +1363,11 @@
     const totals = computeNewEntryTotals(customer, itemsTotal);
     const creditCheck = checkCreditLimit(customer, totals.newTotalUtang);
     const overdueInfo = utangSelectedCustomer ? computeCustomerStatus(utangSelectedCustomer) : null;
-    const hasCustomer = !!(utangSelectedCustomer || utangNewCustomerName);
+    // Don't require the "+ Add as new customer" suggestion to actually be
+    // clicked -- a typed name that's going straight to Save is just as
+    // valid an intent, and requiring that extra click silently disabled
+    // the button with no indication why.
+    const hasCustomer = !!(utangSelectedCustomer || utangNewCustomerName || document.getElementById('utangCustomerInput').value.trim());
 
     const isBlockedByOverdue = !!(overdueInfo && overdueInfo.status === 'overdue' && utangSelectedCustomer?.overdue_behavior === 'block');
 
@@ -1424,7 +1487,15 @@
     let customerForCalc = utangCustomerForCalc();
 
     if (!customerId){
-      customerName = utangNewCustomerName;
+      // Same fallback as the button's enabled check: use the typed name
+      // even if the "+ Add as new customer" suggestion was never clicked.
+      customerName = utangNewCustomerName || document.getElementById('utangCustomerInput').value.trim();
+      if (!customerName){ showToast('Enter a customer name'); return; }
+      if (!canAddNewCustomer()){
+        closeModal('addUtangModal');
+        showLimitBlockedModal();
+        return;
+      }
       const {data, error} = await supabaseClient.from('customers').insert({name: customerName}).select().single();
       if (error){ showToast('Could not create customer'); console.error(error); return; }
       customerId = data.id;
@@ -2398,6 +2469,10 @@
   });
 
   document.getElementById('newCustomerToggle').addEventListener('click', () => {
+    if (!canAddNewCustomer()){
+      showLimitBlockedModal();
+      return;
+    }
     document.getElementById('newCustomerForm').classList.toggle('hidden');
     document.getElementById('newCustomerName').focus();
   });
@@ -2497,7 +2572,7 @@
     document.getElementById('storeNameLabel').textContent = STORE_NAME;
     hideAllTopLevelScreens();
     document.getElementById('appShell').classList.remove('hidden');
-    await fetchCustomers();
+    await Promise.all([fetchCustomers(), fetchProAccountStatus()]);
   }
 
   async function initAuth(){
@@ -2661,6 +2736,16 @@
   document.getElementById('pinSetupCancelLink').addEventListener('click', (e) => {
     e.preventDefault();
     unlockApp();
+  });
+
+  document.getElementById('limitBlockedNotNowBtn').addEventListener('click', () => closeModal('limitBlockedModal'));
+  document.getElementById('limitBlockedUpgradeBtn').addEventListener('click', () => {
+    closeModal('limitBlockedModal');
+    openModal('upgradeModal');
+  });
+  document.getElementById('upgradeNotNowBtn').addEventListener('click', () => closeModal('upgradeModal'));
+  document.getElementById('messageTechSariBtn').addEventListener('click', () => {
+    window.open('https://www.facebook.com/profile.php?id=61572347067884', '_blank', 'noopener');
   });
 
   document.getElementById('logoutBtn').addEventListener('click', async () => {
