@@ -965,22 +965,10 @@
     <div class="modal-body" style="padding:28px 20px 20px;text-align:center;">
       <div style="font-size:2.2rem;margin-bottom:10px;">&#128274;</div>
       <h3 style="margin:0 0 10px;">You've reached your free limit</h3>
-      <div style="font-size:0.9rem;color:var(--muted);line-height:1.5;margin-bottom:16px;">Free accounts can track up to 7 customers. Upgrade to add unlimited customers and keep using everything you've already built.</div>
+      <div style="font-size:0.9rem;color:var(--muted);line-height:1.5;margin-bottom:16px;">Upgrade now to add more customers and unlock unlimited access. Special early access rate available now — message Tech Sari for details.</div>
       <div style="font-weight:700;font-size:1.1rem;margin-bottom:20px;" id="limitBlockedStat">7 / 7</div>
-      <button class="btn-primary" id="limitBlockedUpgradeBtn" style="width:100%;">Upgrade — &#8369;99/month</button>
-      <button class="btn-secondary" id="limitBlockedNotNowBtn" style="width:100%;margin-top:10px;">Not now</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay hidden" id="upgradeModal">
-  <div class="modal-sheet" style="border-radius:18px;max-width:400px;">
-    <div class="modal-body" style="padding:28px 20px 20px;text-align:center;">
-      <div style="font-size:2.2rem;margin-bottom:10px;">&#128274;</div>
-      <h3 style="margin:0 0 10px;">You've reached your free limit</h3>
-      <div style="font-size:0.9rem;color:var(--muted);line-height:1.5;margin-bottom:20px;">Free accounts can track up to 7 customers. Message the Tech Sari page to learn about upgrading and unlocking unlimited customers.</div>
       <button class="btn-primary" id="messageTechSariBtn" style="width:100%;">Message Tech Sari</button>
-      <button class="btn-secondary" id="upgradeNotNowBtn" style="width:100%;margin-top:10px;">Not now</button>
+      <button class="btn-secondary" id="limitBlockedNotNowBtn" style="width:100%;margin-top:10px;">Not now</button>
     </div>
   </div>
 </div>
@@ -2739,11 +2727,6 @@
   });
 
   document.getElementById('limitBlockedNotNowBtn').addEventListener('click', () => closeModal('limitBlockedModal'));
-  document.getElementById('limitBlockedUpgradeBtn').addEventListener('click', () => {
-    closeModal('limitBlockedModal');
-    openModal('upgradeModal');
-  });
-  document.getElementById('upgradeNotNowBtn').addEventListener('click', () => closeModal('upgradeModal'));
   document.getElementById('messageTechSariBtn').addEventListener('click', () => {
     window.open('https://www.facebook.com/profile.php?id=61572347067884', '_blank', 'noopener');
   });
