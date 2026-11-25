@@ -381,6 +381,11 @@
       letter-spacing: -0.03em;
       font-variant-numeric: tabular-nums;
     }
+    .price.no-price, .row-amt.no-price {
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .items-filter { margin: 0 0 14px; }
     .stock {
       font-size: 12px;
       font-weight: 500;
@@ -1224,6 +1229,8 @@
     let quickSelected = new Set();
     let quickRows = null;
     let confirmClearCart = false;
+    let itemsFilter = "all";
+    let setPriceDraft = null;
     let currentUser = null;
     let STORE_NAME = "My Store";
     let isProAccount = false;
@@ -1331,14 +1338,21 @@
     function tileStyle(p) {
       return catVars(catById(productCategory(p)));
     }
+    function hasPrice(p) {
+      return p != null && numOrNull(p.price) > 0;
+    }
+
     function renderTile(p, nameHtml) {
       const qty = cart[p.id] || 0;
       const low = p.stock != null && p.stock <= 5;
       const cat = catById(productCategory(p));
-      return `<button class="tile${qty ? " in-cart" : ""}${cat ? " has-cat" : ""}" type="button" data-add="${p.id}" style="${tileStyle(p)}">
+      const priced = hasPrice(p);
+      const attr = priced ? `data-add="${p.id}"` : `data-set-price="${p.id}"`;
+      const priceLabel = priced ? peso(p.price) : "No price";
+      return `<button class="tile${qty ? " in-cart" : ""}${cat ? " has-cat" : ""}" type="button" ${attr} style="${tileStyle(p)}">
         ${cat ? `<span class="cat-bar"></span>` : ""}
         <div>${qty ? `<span class="qty-badge">${qty}</span>` : ""}<div class="tile-name">${nameHtml || escapeHtml(p.name)}</div></div>
-        <div class="tile-meta"><div class="price">${peso(p.price)}</div><div class="stock${low ? " low" : ""}">${p.stock == null ? "No stock count" : p.stock + " left"}</div></div>
+        <div class="tile-meta"><div class="price${priced ? "" : " no-price"}">${priceLabel}</div><div class="stock${low ? " low" : ""}">${p.stock == null ? "No stock count" : p.stock + " left"}</div></div>
       </button>`;
     }
     function renderCatChips(selected, attr) {
@@ -1363,10 +1377,23 @@
 
     function addToCart(id) {
       const p = products.find((x) => x.id === id);
+      if (!p) return;
+      if (!hasPrice(p)) { openSetPrice(p); return; }
       const next = (cart[id] || 0) + 1;
       if (p.stock != null && next > p.stock) { toast("No more stock"); return; }
       cart[id] = next;
       render();
+    }
+    function openSetPrice(p) {
+      setPriceDraft = {
+        id: p.id,
+        name: p.name,
+        cost: p.cost == null ? "" : String(p.cost),
+        price: hasPrice(p) ? String(p.price) : "",
+        markup: String(defaultMarkup),
+        priceManual: false
+      };
+      openSheet("setPrice");
     }
     function setQty(id, qty) {
       if (qty <= 0) delete cart[id];
@@ -1394,6 +1421,7 @@
       quickRows = null;
       confirmClearCart = false;
       overpayAction = null;
+      setPriceDraft = null;
       $("overlay").classList.remove("show");
       $("sheet").classList.remove("open");
     }
@@ -1626,6 +1654,11 @@
       const total = cartTotal();
       const change = method === "cash" ? Math.max(0, Number(tendered) - total) : 0;
       for (const l of lines) {
+        if (!hasPrice(l)) {
+          toast("Set a price before selling " + l.name);
+          openSetPrice(l);
+          return;
+        }
         if (l.stock != null && l.qty > l.stock) {
           toast("Not enough stock for " + l.name);
           return;
@@ -1935,9 +1968,9 @@
         name: p.name,
         cost: cost == null ? "" : String(cost),
         markup: implied != null ? fmtPct(implied) : String(defaultMarkup),
-        price: String(p.price),
+        price: hasPrice(p) ? String(p.price) : "",
         stock: p.stock == null ? "" : String(p.stock),
-        priceManual: true,
+        priceManual: hasPrice(p),
         addToCart: false,
         confirmDelete: false,
         category: p.category || ((CATEGORIES.find((c) => c.name === "Others") || {}).id) || null
@@ -2115,10 +2148,18 @@
         $("pageProducts").innerHTML = renderQuickStart();
         return;
       }
-      const list = products.filter((p) => !q || p.name.toLowerCase().includes(q));
+      const needPrice = products.filter((p) => !hasPrice(p)).length;
+      let list = products.filter((p) => !q || p.name.toLowerCase().includes(q));
+      if (itemsFilter === "noprice") list = list.filter((p) => !hasPrice(p));
+      const filt = (id, label) => `<button type="button" role="radio" aria-checked="${itemsFilter === id ? "true" : "false"}" data-items-filter="${id}" class="${itemsFilter === id ? "on" : ""}">${label}</button>`;
       $("pageProducts").innerHTML = `
+        <div class="seg items-filter" role="radiogroup" aria-label="Items filter">
+          ${filt("all", "All")}
+          ${filt("noprice", needPrice ? "No price · " + needPrice : "No price")}
+        </div>
         <div class="list">${list.map((p) => {
-          const profit = p.cost != null ? p.price - p.cost : null;
+          const priced = hasPrice(p);
+          const profit = priced && p.cost != null ? p.price - p.cost : null;
           const sub = [
             p.cost != null ? "Cost " + peso(p.cost) : null,
             profit != null ? "Profit " + peso(profit) : null,
@@ -2128,9 +2169,9 @@
           const swatch = cat ? `<span class="swatch" style="${catVars(cat)}"></span>` : "";
           return `<button class="row" type="button" data-edit-item="${p.id}">
             <div><div class="row-title">${swatch}${escapeHtml(p.name)}</div><div class="row-sub">${sub}</div></div>
-            <div class="row-amt">${peso(p.price)}</div>
+            <div class="row-amt${priced ? "" : " no-price"}">${priced ? peso(p.price) : "No price"}</div>
           </button>`;
-        }).join("") || `<div class="empty">No matching items</div>`}</div>
+        }).join("") || `<div class="empty">${itemsFilter === "noprice" ? "Every item has a price" : "No matching items"}</div>`}</div>
         <button class="btn fab-add" type="button" id="addProductBtn">${withIcon("plus", "Add item")}</button>
         <button class="btn btn-ghost" style="width:100%" type="button" id="openQuickStart">Add common items</button>`;
     }
@@ -2157,6 +2198,7 @@
       else if (sheetName === "customer") el.innerHTML = customerHTML();
       else if (sheetName === "addCustomer") el.innerHTML = addCustomerHTML();
       else if (sheetName === "itemForm") el.innerHTML = itemFormHTML();
+      else if (sheetName === "setPrice") el.innerHTML = setPriceHTML();
       else if (sheetName === "settings") el.innerHTML = settingsHTML();
       else if (sheetName === "quickPrices") el.innerHTML = quickPricesHTML();
       else if (sheetName === "limit") el.innerHTML = limitHTML();
@@ -2308,6 +2350,22 @@
         <p class="sheet-sub">Name only is enough to start.</p>
         <input class="cash-input" id="newCustName" placeholder="Customer name" />
         <button class="btn btn-primary" style="width:100%" type="button" id="saveCustomer">Save</button>`;
+    }
+
+    function setPriceHTML() {
+      const d = setPriceDraft;
+      if (!d) return "";
+      applyAutoPrice(d);
+      const canSave = numOrNull(d.price) > 0;
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">Set price</h2>
+        <p class="sheet-sub">${escapeHtml(d.name)}</p>
+        <div class="field-row">
+          <label class="field"><span>Cost</span><input id="setPriceCost" type="number" inputmode="decimal" placeholder="Optional" value="${escapeHtml(d.cost)}" /></label>
+          <label class="field"><span>Price</span><input id="setPriceValue" type="number" inputmode="decimal" value="${escapeHtml(d.price)}" /></label>
+        </div>
+        ${priceHint(d)}
+        <button class="btn btn-primary" style="width:100%" type="button" id="saveSetPrice" ${canSave && !saving ? "" : "disabled"}>Save and add to cart</button>`;
     }
 
     function itemFormHTML() {
@@ -2479,9 +2537,44 @@
     function clicked(e, id) {
       return !!(e.target.closest && e.target.closest("#" + id));
     }
+    async function saveSetPrice() {
+      if (!setPriceDraft || saving || !sb) return;
+      applyAutoPrice(setPriceDraft);
+      const price = numOrNull(setPriceDraft.price);
+      if (!(price > 0)) return;
+      const cost = numOrNull(setPriceDraft.cost);
+      const markup = (cost != null && cost > 0) ? ((price - cost) / cost) * 100 : numOrNull(setPriceDraft.markup);
+      saving = true;
+      if ($("saveSetPrice")) $("saveSetPrice").disabled = true;
+      const { error } = await sb.from("products").update({
+        cost,
+        markup_pct: markup,
+        price
+      }).eq("id", setPriceDraft.id);
+      saving = false;
+      if (error) {
+        toast(calmError(error, "Couldn't save the price"));
+        renderSheet();
+        return;
+      }
+      const id = setPriceDraft.id;
+      setPriceDraft = null;
+      closeSheet();
+      await loadAll();
+      addToCart(id);
+      toast("Price saved");
+    }
+
     document.addEventListener("click", (e) => {
       const add = e.target.closest("[data-add]");
       if (add) addToCart(add.getAttribute("data-add"));
+      const setP = e.target.closest("[data-set-price]");
+      if (setP) {
+        const prod = products.find((x) => x.id === setP.getAttribute("data-set-price"));
+        if (prod) openSetPrice(prod);
+      }
+      const filt = e.target.closest("[data-items-filter]");
+      if (filt) { itemsFilter = filt.getAttribute("data-items-filter"); render(); }
       const tabBtn = e.target.closest("[data-tab]");
       if (tabBtn) setTab(tabBtn.getAttribute("data-tab"));
       if (e.target.closest && e.target.closest(".toast-x")) { dismissToast(); return; }
@@ -2506,6 +2599,7 @@
       const itemCat = e.target.closest("[data-item-cat]");
       if (itemCat && itemDraft) { itemDraft.category = itemCat.getAttribute("data-item-cat"); renderSheet(); }
       if (clicked(e, "saveItem")) saveDraft();
+      if (clicked(e, "saveSetPrice")) saveSetPrice();
       if (clicked(e, "askClearCart")) { confirmClearCart = true; renderSheet(); }
       if (clicked(e, "cancelClearCart")) { confirmClearCart = false; renderSheet(); }
       if (clicked(e, "confirmClearCart")) { cart = {}; confirmClearCart = false; closeSheet(); render(); }
@@ -2598,6 +2692,11 @@
       if (e.target.id === "tenderInput") { cashTendered = e.target.value === "" ? null : Number(e.target.value); renderSheet(); restoreFocus("tenderInput"); }
       if (e.target.id === "chargeSearch") renderSheet();
       if (e.target.id === "payInput") { paymentAmount = e.target.value; overpayAction = null; renderSheet(); restoreFocus("payInput"); }
+      if (setPriceDraft) {
+        if (e.target.id === "setPriceCost") { setPriceDraft.cost = e.target.value; setPriceDraft.priceManual = false; }
+        if (e.target.id === "setPriceValue") { setPriceDraft.price = e.target.value; setPriceDraft.priceManual = true; }
+        if (e.target.id === "setPriceCost" || e.target.id === "setPriceValue") { renderSheet(); restoreFocus(e.target.id); }
+      }
       if (itemDraft) {
         if (e.target.id === "itemName") itemDraft.name = e.target.value;
         if (e.target.id === "itemStock") itemDraft.stock = e.target.value;
