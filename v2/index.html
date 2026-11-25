@@ -1,0 +1,2760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" id="themeColor" content="#F4F3EF" />
+  <title>Utang Tracker</title>
+  <script>
+    (function () {
+      var key = "utang-tracker-theme", pref = "system";
+      try { pref = localStorage.getItem(key) || "system"; } catch (e) {}
+      if (pref !== "light" && pref !== "dark") pref = "system";
+      var dark = pref === "dark" || (pref !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+      document.documentElement.style.colorScheme = dark ? "dark" : "light";
+      var meta = document.getElementById("themeColor");
+      if (meta) meta.setAttribute("content", dark ? "#0F0F10" : "#F4F3EF");
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Pinned for a future live build. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2"></script>
+  <style>
+
+    @font-face { font-family: "Pretendard"; src: url("/v2/fonts/Pretendard-Regular.otf") format("opentype"); font-weight: 400; font-display: swap; }
+    @font-face { font-family: "Pretendard"; src: url("/v2/fonts/Pretendard-Medium.otf") format("opentype"); font-weight: 500; font-display: swap; }
+    @font-face { font-family: "Pretendard"; src: url("/v2/fonts/Pretendard-SemiBold.otf") format("opentype"); font-weight: 600; font-display: swap; }
+    @font-face { font-family: "Pretendard"; src: url("/v2/fonts/Pretendard-Bold.otf") format("opentype"); font-weight: 700; font-display: swap; }
+
+    :root {
+      color-scheme: light;
+      --stage: #C9C7C1;
+      --bg: #F4F3EF;
+      --paper: #FFFFFF;
+      --raised: #FFFFFF;
+      --ink: #1C1A16;
+      --muted: #6A6760;
+      --placeholder: #9A968E;
+      --line: rgba(28, 26, 22, 0.08);
+      --accent: #184A38;
+      --accent-fg: #184A38;
+      --accent-soft: #E7F0EB;
+      --good: #1B6B4A;
+      --warn: #8B3A2A;
+      --danger: #9B2C2C;
+      --toast-bg: #1C1A16;
+      --toast-fg: #F7F5F1;
+      --chart-today: #184A38;
+      --chart-bar: #C9D2CC;
+      --chart-label: #6A6760;
+      --chart-label-today: #1C1A16;
+      --trend-up-bg: #E8F3EC;
+      --trend-up-fg: #1B6B4A;
+      --trend-down-bg: #F6ECEA;
+      --trend-down-fg: #8B3A2A;
+      --danger-line: #ead6d6;
+      --shadow-soft: 0 1px 1px rgba(28, 26, 22, 0.04), 0 6px 18px rgba(28, 26, 22, 0.05);
+      --shadow: 0 1px 2px rgba(28, 26, 22, 0.05), 0 12px 32px rgba(28, 26, 22, 0.08);
+      --shadow-toast: 0 8px 28px rgba(28, 26, 22, 0.22);
+      --ctrl: #F4F3EF;
+      --phone-shadow: 0 0 0 1px rgba(28,26,22,0.06), 0 24px 80px rgba(28,26,22,0.18);
+      --overlay: rgba(20, 18, 16, 0.36);
+      --handle: rgba(28,26,22,0.16);
+      --nav-idle: #8A867E;
+      --radius: 18px;
+      --radius-sm: 14px;
+      --nav-h: 80px;
+      --safe-t: env(safe-area-inset-top, 0px);
+      --safe-b: env(safe-area-inset-bottom, 0px);
+      --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+      --press: 100ms cubic-bezier(0.2, 0, 0, 1);
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --stage: #080809;
+      --bg: #0F0F10;
+      --paper: #1A1A1C;
+      --raised: #232326;
+      --ink: #F2F1EE;
+      --muted: #A8A6A0;
+      --placeholder: #8E8C86;
+      --line: rgba(242, 241, 238, 0.09);
+      --accent: #2A7A58;
+      --accent-fg: #6EC9A0;
+      --accent-soft: #1A2A23;
+      --good: #6FCB9A;
+      --warn: #E08A7A;
+      --danger: #E87B7B;
+      --toast-bg: #3A3A40;
+      --toast-fg: #F2F1EE;
+      --ctrl: #2A2A2E;
+      --chart-today: #6EC9A0;
+      --chart-bar: #3A3A3E;
+      --chart-label: #A8A6A0;
+      --chart-label-today: #F2F1EE;
+      --trend-up-bg: #1A2A23;
+      --trend-up-fg: #6FCB9A;
+      --trend-down-bg: #2A1C1B;
+      --trend-down-fg: #E08A7A;
+      --danger-line: rgba(232, 123, 123, 0.35);
+      --shadow-soft: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.35);
+      --shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 16px 40px rgba(0, 0, 0, 0.45);
+      --shadow-toast: 0 8px 28px rgba(0, 0, 0, 0.5);
+      --phone-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 24px 80px rgba(0,0,0,0.65);
+      --overlay: rgba(0, 0, 0, 0.58);
+      --handle: rgba(242,241,238,0.22);
+      --nav-idle: #8E8C86;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; height: 100dvh; margin: 0; }
+    body {
+      font-family: "Pretendard", "DM Sans", "Noto Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--stage);
+      color: var(--ink);
+      display: flex;
+      justify-content: center;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      letter-spacing: -0.011em;
+    }
+    button, input, select, textarea {
+      font: inherit;
+      appearance: none;
+      -webkit-appearance: none;
+      border-radius: 0;
+    }
+    input[type="search"]::-webkit-search-decoration,
+    input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+    button { cursor: pointer; border: 0; background: none; color: inherit; }
+    button:focus-visible, input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .phone {
+      position: relative;
+      width: 100%;
+      max-width: 430px;
+      height: 100%;
+      height: 100dvh;
+      max-height: 100dvh;
+      margin: 0 auto;
+      background: var(--bg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--phone-shadow);
+    }
+
+    .top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: calc(16px + var(--safe-t)) 24px 8px;
+      flex: 0 0 auto;
+    }
+    .top-text { min-width: 0; flex: 1; }
+    .store {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.045em;
+      line-height: 1.05;
+      margin: 0;
+    }
+    .eyebrow {
+      margin-top: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: -0.01em;
+      line-height: 1.3;
+    }
+    .pill {
+      flex: 0 0 auto;
+      margin-top: 6px;
+      background: var(--paper);
+      border: 0;
+      border-radius: 999px;
+      height: 32px;
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      color: var(--ink);
+      box-shadow: var(--shadow-soft);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      transition: transform var(--press), background var(--press);
+    }
+    button.pill:active { transform: scale(0.97); }
+
+    .search-wrap {
+      flex: 0 0 auto;
+      padding: 8px 24px 10px;
+    }
+    .search-field {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    #searchIco {
+      position: absolute;
+      left: 14px;
+      top: 0;
+      bottom: 0;
+      width: 18px;
+      height: 18px;
+      margin: auto 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      pointer-events: none;
+    }
+    #searchIco .ico,
+    .search-field .ico {
+      position: static;
+      width: 18px;
+      height: 18px;
+      display: block;
+      color: inherit;
+    }
+    .search, .search-field .search {
+      width: 100%;
+      height: 44px;
+      border: 0;
+      background: var(--paper);
+      border-radius: 12px;
+      padding: 0 16px 0 42px;
+      font-size: 16px;
+      letter-spacing: -0.016em;
+      color: var(--ink);
+      box-shadow: inset 0 0 0 1px var(--line);
+      transition: box-shadow 160ms ease;
+    }
+    .search::placeholder { color: var(--placeholder); }
+    .search:focus {
+      outline: none;
+      box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, var(--line));
+    }
+    /* Bare search inputs in sheets (no leading icon) */
+    .sheet .search { padding-left: 16px; }
+
+    .cat-wrap {
+      position: relative;
+      flex: 0 0 auto;
+      padding: 0 0 8px;
+    }
+    .cat-wrap::before,
+    .cat-wrap::after {
+      content: "";
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 28px;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0;
+      transition: opacity 160ms ease;
+    }
+    .cat-wrap::before {
+      left: 0;
+      background: linear-gradient(to right, var(--bg) 20%, transparent);
+    }
+    .cat-wrap::after {
+      right: 0;
+      background: linear-gradient(to left, var(--bg) 20%, transparent);
+    }
+    .cat-wrap.fade-left::before,
+    .cat-wrap.fade-right::after { opacity: 1; }
+    .cat-scroller {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 8px;
+      padding: 0 24px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .cat-scroller::-webkit-scrollbar { display: none; }
+    .cat-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      flex: 0 0 auto;
+      white-space: nowrap;
+      min-height: 44px;
+      padding: 0 14px 0 12px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      box-shadow: var(--shadow-soft);
+      transition: transform var(--press), background 160ms ease, color 160ms ease;
+    }
+    .cat-chip .swatch {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--cat, #8A8680);
+      flex: 0 0 auto;
+    }
+    .cat-chip.on {
+      background: var(--cat-tint, var(--accent-soft));
+      color: var(--ink);
+      box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--cat, var(--accent)) 38%, transparent);
+    }
+    .cat-chip:active { transform: scale(0.97); }
+
+    .page {
+      flex: 1;
+      overflow: auto;
+      padding: 6px 24px calc(var(--nav-h) + var(--safe-b) + 16px);
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+    .page.has-cart { padding-bottom: calc(var(--nav-h) + var(--safe-b) + 86px); }
+    .hidden { display: none !important; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .tile {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-align: left;
+      min-height: 128px;
+      padding: 16px 16px 14px;
+      background: var(--paper);
+      border: 0;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-soft);
+      transition: transform var(--press), box-shadow 180ms ease;
+    }
+    .tile.has-cat { padding-left: 18px; }
+    .tile .cat-bar {
+      position: absolute;
+      left: 0; top: 14px; bottom: 14px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--cat, #8A8680);
+    }
+    .tile.has-cat {
+      background: color-mix(in srgb, var(--cat-tint, var(--paper)) 70%, var(--paper));
+    }
+    .tile.in-cart {
+      box-shadow: var(--shadow-soft), inset 0 0 0 1.5px var(--accent);
+    }
+    .tile:active { transform: scale(0.975); }
+    .tile-name {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+    .tile-meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .price {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+    }
+    .stock {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .stock.low { color: var(--warn); }
+    .qty-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      margin-bottom: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+    .hit {
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      border-radius: 3px;
+      padding: 0 1px;
+    }
+
+    .sec-label, .section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: -0.01em;
+      margin: 10px 0 12px;
+    }
+    .sec-label.later { margin-top: 22px; }
+
+    .list { display: flex; flex-direction: column; gap: 8px; }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      text-align: left;
+      background: var(--paper);
+      border: 0;
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      box-shadow: var(--shadow-soft);
+      transition: transform var(--press);
+    }
+    button.row:active { transform: scale(0.985); }
+    .row-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+    .row-sub {
+      margin-top: 3px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: -0.01em;
+    }
+    .row-amt {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .due { color: var(--warn); }
+    .row .swatch {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; margin-right: 8px;
+      background: var(--cat, #8A8680); vertical-align: 1px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .stat {
+      background: var(--paper);
+      border: 0;
+      border-radius: var(--radius);
+      padding: 16px 16px 14px;
+      box-shadow: var(--shadow-soft);
+    }
+    .stat.wide { grid-column: 1 / -1; }
+    .stat-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: -0.01em;
+    }
+    .stat-value {
+      margin-top: 6px;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+    .profit { color: var(--good); }
+
+    .week-card {
+      background: var(--paper);
+      border-radius: var(--radius);
+      padding: 18px 16px 10px;
+      box-shadow: var(--shadow-soft);
+    }
+    .week-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 4px 8px;
+    }
+    .week-total {
+      margin-top: 4px;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.045em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+    .trend {
+      margin-top: 2px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .trend.up { background: var(--trend-up-bg); color: var(--trend-up-fg); }
+    .trend.down { background: var(--trend-down-bg); color: var(--trend-down-fg); }
+    .week-chart { display: block; width: 100%; height: auto; overflow: visible; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 0;
+      border-radius: 16px;
+      min-height: 52px;
+      padding: 0 18px;
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      transition: transform var(--press), opacity 120ms ease, background 160ms ease;
+    }
+    .btn .ico { width: 18px; height: 18px; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:disabled { opacity: 0.38; transform: none; }
+    .btn-secondary {
+      background: var(--ctrl);
+      color: var(--ink);
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      min-height: 44px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .btn-row { display: flex; gap: 10px; }
+    .btn-row .btn { flex: 1; }
+    .btn-danger {
+      background: var(--paper);
+      color: var(--danger);
+      box-shadow: inset 0 0 0 1px var(--danger-line);
+      width: 100%;
+      margin-top: 8px;
+    }
+    .fab-add {
+      width: 100%;
+      margin-top: 12px;
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: inset 0 0 0 1px dashed color-mix(in srgb, var(--ink) 16%, transparent);
+    }
+
+    .cart-bar {
+      position: absolute;
+      left: 16px; right: 16px;
+      bottom: calc(var(--nav-h) + var(--safe-b) + 12px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 56px;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 18px;
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 10px 28px rgba(24, 74, 56, 0.32);
+      font-size: 15px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      transition: transform var(--press);
+      z-index: 5;
+    }
+    .cart-bar:active { transform: scale(0.98); }
+    .cart-bar span { font-weight: 500; opacity: 0.86; }
+    .cart-bar strong {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cart-bar .ico { width: 18px; height: 18px; }
+
+    .nav {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: calc(var(--nav-h) + var(--safe-b));
+      padding: 6px 8px var(--safe-b);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background: color-mix(in srgb, var(--paper) 86%, transparent);
+      backdrop-filter: saturate(1.6) blur(22px);
+      -webkit-backdrop-filter: saturate(1.6) blur(22px);
+      border-top: 0.5px solid var(--line);
+      z-index: 6;
+    }
+    .nav button {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 4px;
+      padding-top: 6px;
+      color: var(--nav-idle);
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      transition: color 160ms ease, transform var(--press);
+    }
+    .nav button .ico { width: 24px; height: 24px; }
+    .nav button.active { color: var(--accent-fg); }
+    .nav button:active { transform: scale(0.94); }
+
+    .overlay {
+      position: absolute; inset: 0;
+      background: var(--overlay);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.36s var(--ease-out);
+      z-index: 20;
+    }
+    .overlay.show { opacity: 1; pointer-events: auto; }
+    .sheet {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      background: var(--raised);
+      border-radius: 22px 22px 0 0;
+      padding: 8px 24px calc(24px + var(--safe-b));
+      max-height: 92%;
+      overflow: auto;
+      overscroll-behavior: contain;
+      transform: translateY(110%);
+      transition: transform 0.48s var(--ease-out);
+      z-index: 21;
+      box-shadow: 0 -16px 48px rgba(28, 26, 22, 0.14);
+    }
+    .sheet.open { transform: translateY(0); }
+    .handle {
+      width: 36px; height: 5px;
+      border-radius: 99px;
+      background: var(--handle);
+      margin: 6px auto 14px;
+    }
+    .sheet-title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      margin: 0 0 4px;
+    }
+    .sheet-sub {
+      margin: 0 0 18px;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: -0.015em;
+    }
+
+    .cart-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 0.5px solid var(--line);
+    }
+    .cart-line:last-of-type { border-bottom: 0; }
+    .stepper { display: flex; align-items: center; gap: 4px; }
+    .stepper .n {
+      min-width: 28px;
+      text-align: center;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-size: 16px;
+    }
+    .stepper button {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: var(--ctrl);
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--ink);
+      transition: transform var(--press);
+    }
+    .stepper button:active { transform: scale(0.94); }
+    .total-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin: 16px 0 18px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .total-row strong {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tender {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .tender button {
+      min-height: 48px;
+      border-radius: 14px;
+      background: var(--ctrl);
+      font-weight: 650;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      transition: transform var(--press), background 160ms ease, color 160ms ease;
+    }
+    .tender button.on { background: var(--accent); color: #fff; }
+    .tender button:active { transform: scale(0.97); }
+    .cash-input, .field input {
+      width: 100%;
+      height: 52px;
+      border: 0;
+      border-radius: 14px;
+      background: var(--ctrl);
+      padding: 0 16px;
+      font-size: 17px;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      color: var(--ink);
+      box-shadow: inset 0 0 0 1px var(--line);
+      margin-bottom: 12px;
+    }
+    .cash-input:focus, .field input:focus {
+      outline: none;
+      box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, var(--line));
+    }
+    .change-box {
+      background: var(--accent-soft);
+      border-radius: 16px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .change-box .lbl { font-size: 14px; font-weight: 600; color: var(--muted); }
+    .change-box .val {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .change-box.short .val { color: var(--warn); }
+
+    .cust { }
+    .confirm-note {
+      background: var(--ctrl);
+      border-radius: 16px;
+      padding: 16px 18px;
+      margin: 4px 0 18px;
+      font-size: 15px;
+      line-height: 1.5;
+      letter-spacing: -0.015em;
+    }
+    .receipt {
+      background: var(--ctrl);
+      border-radius: 16px;
+      padding: 20px 18px;
+      margin-bottom: 18px;
+    }
+    .receipt h3 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .receipt .meta {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 14px;
+    }
+    .receipt .line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 0;
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
+    }
+    .receipt .sum {
+      margin-top: 8px;
+      padding-top: 10px;
+      border-top: 0.5px solid var(--line);
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 36px 12px;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .toaster {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      top: auto;
+      bottom: calc(var(--nav-h) + var(--safe-b) + 16px);
+      z-index: 80;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toaster.above-cart {
+      bottom: calc(var(--nav-h) + var(--safe-b) + 86px);
+    }
+    .toaster.on-sheet {
+      top: calc(12px + var(--safe-t));
+      bottom: auto;
+    }
+    .toast-card {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 46px;
+      max-width: 100%;
+      padding: 10px 16px 10px 14px;
+      background: var(--toast-bg);
+      color: var(--toast-fg);
+      border-radius: 14px;
+      box-shadow: var(--shadow-toast), inset 0 0 0 1px var(--line);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      transform: translateY(12px);
+      opacity: 0;
+      animation: toast-in 0.44s var(--ease-out) forwards;
+    }
+    .toaster.on-sheet .toast-card { transform: translateY(-12px); }
+    .toast-card.out { animation: toast-out 0.28s ease forwards; }
+    .toast-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #7DCEA0;
+      flex: 0 0 auto;
+    }
+    .toast-msg { line-height: 1.3; }
+    @keyframes toast-in {
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes toast-out {
+      to { transform: translateY(-8px); opacity: 0; }
+    }
+
+    .demo-flag { display: none; }
+    .field { margin-bottom: 12px; }
+    .field > span {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+    .hint-box {
+      background: var(--accent-soft);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin: 4px 0 14px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--ink);
+    }
+    .hint-box .muted { color: var(--muted); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .chip {
+      border: 0;
+      background: var(--bg);
+      border-radius: 999px;
+      min-height: 40px;
+      padding: 0 14px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      transition: transform var(--press), background 160ms ease, color 160ms ease;
+    }
+    .chip.on { background: var(--accent); color: #fff; }
+    .chip:active { transform: scale(0.97); }
+    .quick-block { margin-top: 8px; }
+    .sell-miss { text-align: center; padding: 36px 8px 16px; }
+    .sell-miss p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .sell-miss .btn { width: 100%; }
+    .field-row { display: flex; gap: 10px; }
+    .field-row .field { flex: 1; min-width: 0; }
+    .cat-pick { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+    .cat-pick .cat-chip { min-height: 44px; }
+    .seg {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      margin: 0 0 18px;
+      background: var(--bg);
+      border-radius: 14px;
+    }
+    .seg button {
+      flex: 1;
+      min-height: 44px;
+      border-radius: 11px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      transition: transform var(--press), background 160ms ease, color 160ms ease;
+    }
+    .seg button.on {
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: var(--shadow-soft);
+    }
+    html[data-theme="dark"] .seg button.on { background: #2C2C30; }
+    .seg button:active { transform: scale(0.97); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+  
+    .gate {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      background: var(--bg);
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      padding-top: max(24px, var(--safe-t));
+      padding-bottom: max(24px, var(--safe-b));
+      overflow: auto;
+    }
+    .gate-card { width: 100%; max-width: 380px; }
+    .gate-brand {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.045em;
+      margin: 0 0 8px;
+    }
+    .gate-sub {
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 500;
+      margin: 0 0 24px;
+    }
+    .gate a { color: var(--accent-fg); font-weight: 600; text-decoration: none; }
+    .field-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      margin: 0 0 6px;
+    }
+    .gate .cash-input { margin-bottom: 12px; }
+    .pin-input {
+      text-align: center;
+      letter-spacing: 0.4em;
+      font-size: 28px;
+      font-weight: 600;
+    }
+    .pin-error { color: var(--danger); font-size: 13px; font-weight: 600; margin: 8px 0 0; text-align: center; }
+    .gate-foot { text-align: center; margin-top: 28px; }
+    .gate-foot img { width: 52px; height: auto; border-radius: 10px; }
+    .gate-foot div { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .gate-switch { text-align: center; margin-top: 14px; font-size: 14px; }
+    #gateToaster.toaster {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      top: auto;
+      bottom: max(24px, var(--safe-b));
+      z-index: 95;
+    }
+    .overpay { margin: 0 0 16px; padding: 12px 14px; background: var(--ctrl); border-radius: 14px; }
+    .overpay p { margin: 0 0 10px; font-size: 14px; font-weight: 500; color: var(--ink); line-height: 1.4; }
+    .seg-tight { margin-bottom: 0; }
+
+  </style>
+</head>
+<body>
+
+  <div class="toaster" id="gateToaster" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="authScreen" class="gate">
+    <div class="gate-card">
+      <h1 class="gate-brand">Utang Tracker</h1>
+      <p class="gate-sub">Sign in to your store</p>
+      <div id="loginPanel">
+        <label class="field-label" for="loginEmail">Email</label>
+        <input class="cash-input" type="email" id="loginEmail" autocomplete="username" />
+        <label class="field-label" for="loginPassword">Password</label>
+        <input class="cash-input" type="password" id="loginPassword" autocomplete="current-password" />
+        <button class="btn btn-primary" style="width:100%" type="button" id="loginBtn">Log in</button>
+        <div class="gate-switch">New here? <a href="#" id="showSignupLink">Create an account</a></div>
+      </div>
+      <div id="signupPanel" class="hidden">
+        <label class="field-label" for="signupEmail">Email</label>
+        <input class="cash-input" type="email" id="signupEmail" autocomplete="username" />
+        <label class="field-label" for="signupPassword">Password</label>
+        <input class="cash-input" type="password" id="signupPassword" autocomplete="new-password" />
+        <button class="btn btn-primary" style="width:100%" type="button" id="signupBtn">Create account</button>
+        <div class="gate-switch">Already have an account? <a href="#" id="showLoginLink">Log in</a></div>
+      </div>
+      <div class="gate-foot">
+        <img src="/v2/techsari-logo.png" alt="Tech Sari" />
+        <div>Made by Tech Sari</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pinScreen" class="gate hidden">
+    <div class="gate-card" style="max-width:340px;text-align:center">
+      <h1 class="gate-brand" id="pinScreenTitle">Enter your PIN</h1>
+      <p class="gate-sub" id="pinScreenSubtitle">Quick unlock for this device</p>
+      <div id="pinEntryMode">
+        <input class="cash-input pin-input" type="password" id="pinEntryInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
+        <div class="pin-error hidden" id="pinEntryError">Wrong PIN. Try again.</div>
+        <div class="gate-switch"><a href="#" id="pinForgotLink">Log in with email instead</a></div>
+      </div>
+      <div id="pinSetupMode" class="hidden" style="text-align:left">
+        <label class="field-label" for="pinSetupInput">Choose a 4-digit PIN</label>
+        <input class="cash-input pin-input" type="password" id="pinSetupInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
+        <label class="field-label" for="pinConfirmInput">Confirm PIN</label>
+        <input class="cash-input pin-input" type="password" id="pinConfirmInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
+        <div class="pin-error hidden" id="pinSetupError">PINs don't match.</div>
+        <button class="btn btn-primary" style="width:100%;margin-top:4px" type="button" id="pinSetupBtn">Set PIN</button>
+        <div class="hidden gate-switch" id="pinSetupCancelRow"><a href="#" id="pinSetupCancelLink">Cancel</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="storeNameScreen" class="gate hidden">
+    <div class="gate-card">
+      <h1 class="gate-brand">Name your store</h1>
+      <p class="gate-sub">This appears on receipts and at the top of the app.</p>
+      <label class="field-label" for="onboardStoreNameInput">Store name</label>
+      <input class="cash-input" id="onboardStoreNameInput" maxlength="80" autocomplete="organization" />
+      <button class="btn btn-primary" style="width:100%" type="button" id="storeNameContinueBtn">Continue</button>
+    </div>
+  </div>
+
+  <div id="welcomeScreen" class="gate hidden">
+    <div class="gate-card" style="text-align:center">
+      <h1 class="gate-brand" id="welcomeMessage">You're all set</h1>
+      <p class="gate-sub">You can start selling whenever you're ready.</p>
+      <button class="btn btn-primary" style="width:100%" type="button" id="welcomeContinueBtn">Continue</button>
+    </div>
+  </div>
+
+  <div class="phone hidden" id="app">
+    <div class="toaster" id="toaster" role="status" aria-live="polite" aria-atomic="true" aria-relevant="additions"></div>
+
+    <header class="top">
+      <div class="top-text">
+        <h1 class="store" id="topTitle">Utang Tracker</h1>
+        <div class="eyebrow" id="topEyebrow">Today</div>
+      </div>
+      <button class="pill" id="topPill" type="button">Store</button>
+    </header>
+
+    <div class="search-wrap" id="searchWrap">
+      <div class="search-field">
+        <span id="searchIco" aria-hidden="true"></span>
+        <input class="search" id="search" type="search" placeholder="Search products" autocomplete="off" enterkeyhint="search" />
+      </div>
+    </div>
+    <div class="cat-wrap hidden" id="catWrap">
+      <div class="cat-scroller" id="catScroller"></div>
+    </div>
+
+    <div class="page" id="pageSell"></div>
+    <div class="page hidden" id="pageUtang"></div>
+    <div class="page hidden" id="pageProducts"></div>
+    <div class="page hidden" id="pageToday"></div>
+
+    <button class="cart-bar hidden" id="cartBar" type="button"></button>
+
+    <nav class="nav" id="tabNav"></nav>
+
+    <div class="overlay" id="overlay"></div>
+    <div class="sheet" id="sheet"></div>
+  </div>
+
+  <script>
+
+    const SUPABASE_URL = "https://uoetrucrflldxmpcrpag.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_hpmnluGoHzFK0A5wA8oz6Q_ZFWNYpB9";
+    const supabaseReady = !!(window.supabase && window.supabase.createClient);
+    const sb = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+    const FREE_CUSTOMER_LIMIT = 7;
+    const TECHSARI_FB = "https://www.facebook.com/profile.php?id=61572347067884";
+
+    const pesoFmt = new Intl.NumberFormat("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const peso = (n) => "₱\u202f" + pesoFmt.format(Number(n));
+    const uid = () => Math.random().toString(36).slice(2, 10);
+    const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+    const numOrNull = (v) => {
+      if (v === "" || v == null) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    const roundUpPeso = (n) => Math.ceil(n - 1e-10);
+    const fmtPct = (n) => {
+      if (n == null || !Number.isFinite(n)) return null;
+      const r = Math.round(n * 10) / 10;
+      return Number.isInteger(r) ? String(r) : r.toFixed(1);
+    };
+    const round2 = (n) => Math.round((Number(n || 0) + Number.EPSILON) * 100) / 100;
+    const todayISO = () => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return y + "-" + m + "-" + day;
+    };
+    const startOfDay = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x.getTime(); };
+
+    let CATEGORIES = [];
+    const catById = (id) => CATEGORIES.find((c) => c.id === id);
+    function isDarkTheme() {
+      return document.documentElement.dataset.theme === "dark";
+    }
+    function catVars(c) {
+      if (!c) return "";
+      const color = isDarkTheme() ? (c.darkColor || c.color) : c.color;
+      const tint = isDarkTheme() ? (c.darkTint || c.tint) : c.tint;
+      return `--cat:${color};--cat-tint:${tint}`;
+    }
+    const COMMON_ITEMS = [
+      "Lucky Me Pancit Canton", "Mega Sardines", "Coke 8oz", "Eggs", "Bigas 1kg",
+      "Nescafe 3-in-1", "C2 230ml", "Tasty Bread", "Magic Sarap", "Load 50",
+      "Silver Swan Soy", "Century Tuna", "Royal 8oz", "Water 500ml",
+      "Palmolive Sachet", "Piattos", "Pan de sal", "Pepsi 8oz"
+    ];
+    const THEME_KEY = "utang-tracker-theme";
+    function getThemePref() {
+      try {
+        const v = localStorage.getItem(THEME_KEY);
+        if (v === "light" || v === "dark" || v === "system") return v;
+      } catch (e) {}
+      return "system";
+    }
+    function resolvedTheme(pref) {
+      if (pref === "light" || pref === "dark") return pref;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    function applyTheme(pref) {
+      const mode = resolvedTheme(pref || getThemePref());
+      document.documentElement.dataset.theme = mode;
+      document.documentElement.style.colorScheme = mode;
+      const meta = document.getElementById("themeColor");
+      if (meta) meta.setAttribute("content", mode === "dark" ? "#0F0F10" : "#F4F3EF");
+    }
+    function setThemePref(pref) {
+      try { localStorage.setItem(THEME_KEY, pref); } catch (e) {}
+      applyTheme(pref);
+      render();
+    }
+    let defaultMarkup = 20;
+    let selectedCategory = "all";
+    let products = [];
+    let customers = [];
+    let sales = [];
+    let paymentsLedger = [];
+    let cart = {};
+    let tab = "sell";
+    let query = "";
+    let sheetName = null;
+    let cashTendered = null;
+    let selectedCustomer = null;
+    let lastReceipt = null;
+    let paymentAmount = "";
+    let overpayAction = null;
+    let itemDraft = null;
+    let quickSelected = new Set();
+    let quickRows = null;
+    let confirmClearCart = false;
+    let currentUser = null;
+    let STORE_NAME = "My Store";
+    let isProAccount = false;
+    let justCompletedOnboarding = false;
+    let saving = false;
+    let unlocked = false;
+
+    const $ = (id) => document.getElementById(id);
+
+    const ICONS = {
+      search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>',
+      plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+      back: '<path d="m15 18-6-6 6-6"/>',
+      bag: '<path d="M6.33 8h11.34a2 2 0 0 1 1.98 2.3l-1.26 8.16A3 3 0 0 1 15.43 21H8.57a3 3 0 0 1-2.96-2.54L4.35 10.3A2 2 0 0 1 6.33 8z"/><path d="M9 11V6a3 3 0 0 1 6 0v5"/>',
+      wallet: '<path d="M17 8V5a1 1 0 0 0-1-1H6a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3"/><path d="M3 8v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-5"/><path d="M17 12h3v4h-3a2 2 0 0 1 0-4z"/>',
+      package: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12 4 7.5"/><path d="m12 12 8-4.5"/><path d="M12 12v9"/>',
+      chart: '<path d="M3 20h18"/><path d="M7 16v-5"/><path d="M12 16V6"/><path d="M17 16v-8"/>'
+    };
+    function icon(name) {
+      return `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+    }
+    function withIcon(name, label) {
+      return `${icon(name)}<span>${label}</span>`;
+    }
+    function renderNav() {
+      const tabs = [
+        ["sell", "bag", "Sell"],
+        ["utang", "wallet", "Utang"],
+        ["products", "package", "Items"],
+        ["today", "chart", "Today"]
+      ];
+      $("tabNav").innerHTML = tabs.map(([id, ic, label]) =>
+        `<button type="button" data-tab="${id}" class="${tab === id ? "active" : ""}">${icon(ic)}<span>${label}</span></button>`
+      ).join("");
+    }
+    function toast(msg, opts) {
+      opts = opts || {};
+      const host = (unlocked && $("toaster")) ? $("toaster") : ($("gateToaster") || $("toaster"));
+      if (!host) return;
+      const el = document.createElement("div");
+      el.className = "toast-card";
+      el.innerHTML = `<span class="toast-dot"></span><span class="toast-msg">${escapeHtml(msg)}</span>`;
+      host.appendChild(el);
+      syncToasterPos();
+      if (opts.hold) return el;
+      const life = opts.ms || 2000;
+      el._t = setTimeout(() => dismissToast(el), life);
+      return el;
+    }
+    function dismissToast(el) {
+      if (!el || el.classList.contains("out")) return;
+      clearTimeout(el._t);
+      el.classList.add("out");
+      setTimeout(() => el.remove(), 280);
+    }
+    function syncToasterPos() {
+      const el = $("toaster");
+      if (!el) return;
+      const cartUp = !sheetName && tab === "sell" && cartCount() > 0;
+      el.classList.toggle("on-sheet", !!sheetName);
+      el.classList.toggle("above-cart", cartUp);
+    }
+    function updateCatFade() {
+      const wrap = $("catWrap");
+      const sc = $("catScroller");
+      if (!wrap || !sc || wrap.classList.contains("hidden")) return;
+      const max = sc.scrollWidth - sc.clientWidth - 2;
+      wrap.classList.toggle("fade-left", sc.scrollLeft > 6);
+      wrap.classList.toggle("fade-right", max > 2 && sc.scrollLeft < max);
+    }
+    function scrollChipIntoView(id) {
+      const el = document.querySelector('#catScroller [data-cat="' + id + '"]');
+      if (!el) return;
+      el.scrollIntoView({ inline: "center", block: "nearest", behavior: "auto" });
+      updateCatFade();
+    }
+
+    function matchQuery(name, q) {
+      const ql = (q || "").trim().toLowerCase();
+      if (!ql) return { ok: true, rank: 2, html: escapeHtml(name) };
+      let any = false, firstWord = false, wordIndex = 0, html = "", cursor = 0;
+      for (const wm of name.matchAll(/[^\s]+/g)) {
+        const word = wm[0];
+        const start = wm.index;
+        html += escapeHtml(name.slice(cursor, start));
+        if (word.toLowerCase().startsWith(ql)) {
+          any = true;
+          if (wordIndex === 0) firstWord = true;
+          html += `<span class="hit">${escapeHtml(word.slice(0, ql.length))}</span>${escapeHtml(word.slice(ql.length))}`;
+        } else {
+          html += escapeHtml(word);
+        }
+        cursor = start + word.length;
+        wordIndex += 1;
+      }
+      html += escapeHtml(name.slice(cursor));
+      return { ok: any, rank: firstWord ? 0 : 1, html };
+    }
+    function productCategory(p) {
+      return p.category || "others";
+    }
+    function inCategory(p) {
+      return selectedCategory === "all" || productCategory(p) === selectedCategory;
+    }
+    function tileStyle(p) {
+      return catVars(catById(productCategory(p)));
+    }
+    function renderTile(p, nameHtml) {
+      const qty = cart[p.id] || 0;
+      const low = p.stock != null && p.stock <= 5;
+      const cat = catById(productCategory(p));
+      return `<button class="tile${qty ? " in-cart" : ""}${cat ? " has-cat" : ""}" type="button" data-add="${p.id}" style="${tileStyle(p)}">
+        ${cat ? `<span class="cat-bar"></span>` : ""}
+        <div>${qty ? `<span class="qty-badge">${qty}</span>` : ""}<div class="tile-name">${nameHtml || escapeHtml(p.name)}</div></div>
+        <div class="tile-meta"><div class="price">${peso(p.price)}</div><div class="stock${low ? " low" : ""}">${p.stock == null ? "No stock count" : p.stock + " left"}</div></div>
+      </button>`;
+    }
+    function renderCatChips(selected, attr) {
+      const allOn = selected === "all" || !selected;
+      const allCat = catById("others");
+      let html = `<button class="cat-chip${allOn ? " on" : ""}" type="button" ${attr}="all" style="${catVars(allCat)}"><span class="swatch"></span>All</button>`;
+      html += CATEGORIES.map((c) => {
+        const on = selected === c.id;
+        return `<button class="cat-chip${on ? " on" : ""}" type="button" ${attr}="${c.id}" style="${catVars(c)}"><span class="swatch"></span>${escapeHtml(c.name)}</button>`;
+      }).join("");
+      return html;
+    }
+
+    function cartLines() {
+      return Object.entries(cart).map(([id, qty]) => {
+        const p = products.find((x) => x.id === id);
+        return { ...p, qty, line: p.price * qty };
+      });
+    }
+    function cartTotal() { return cartLines().reduce((s, l) => s + l.line, 0); }
+    function cartCount() { return cartLines().reduce((s, l) => s + l.qty, 0); }
+
+    function addToCart(id) {
+      const p = products.find((x) => x.id === id);
+      const next = (cart[id] || 0) + 1;
+      if (p.stock != null && next > p.stock) { toast("No more stock"); return; }
+      cart[id] = next;
+      render();
+    }
+    function setQty(id, qty) {
+      if (qty <= 0) delete cart[id];
+      else {
+        const p = products.find((x) => x.id === id);
+        if (p.stock != null && qty > p.stock) { toast("No more stock"); return; }
+        cart[id] = qty;
+      }
+      if (!cartCount()) closeSheet();
+      render();
+    }
+
+    function openSheet(name) {
+      sheetName = name;
+      $("overlay").classList.add("show");
+      $("sheet").classList.add("open");
+      renderSheet();
+    }
+    function closeSheet() {
+      sheetName = null;
+      selectedCustomer = null;
+      cashTendered = null;
+      paymentAmount = "";
+      itemDraft = null;
+      quickRows = null;
+      confirmClearCart = false;
+      overpayAction = null;
+      $("overlay").classList.remove("show");
+      $("sheet").classList.remove("open");
+    }
+    function calmError(error, fallback) {
+      const msg = (error && (error.message || error.error_description || error.hint)) || "";
+      const low = String(msg).toLowerCase();
+      if (low.includes("not enough stock")) return "Not enough stock for that item";
+      if (low.includes("amount does not match")) return "The total doesn't match the items";
+      if (low.includes("not authorized") || low.includes("customer required")) return "Choose a customer for this utang";
+      if (low.includes("failed to fetch") || low.includes("network")) return "Check your connection and try again";
+      if (low.includes("invalid login") || low.includes("invalid credentials")) return "Email or password is incorrect";
+      return fallback;
+    }
+    function pinHashKey(userId) { return "utang_pin_hash_" + userId; }
+    async function sha256Hex(text) {
+      const data = new TextEncoder().encode(text);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+      return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    function hideAllTopLevelScreens() {
+      ["authScreen","pinScreen","storeNameScreen","welcomeScreen"].forEach((id) => $(id).classList.add("hidden"));
+      $("app").classList.add("hidden");
+    }
+    function showAuthScreen() {
+      hideAllTopLevelScreens();
+      $("authScreen").classList.remove("hidden");
+      $("signupPanel").classList.add("hidden");
+      $("loginPanel").classList.remove("hidden");
+    }
+    function showStoreNameScreen() {
+      hideAllTopLevelScreens();
+      $("storeNameScreen").classList.remove("hidden");
+      $("onboardStoreNameInput").value = "";
+    }
+    function showWelcomeScreen() {
+      hideAllTopLevelScreens();
+      $("welcomeScreen").classList.remove("hidden");
+      const name = currentUser?.user_metadata?.store_name || "there";
+      $("welcomeMessage").textContent = "You're all set, " + name;
+    }
+    function showPinScreen(mode, allowCancel) {
+      hideAllTopLevelScreens();
+      $("pinScreen").classList.remove("hidden");
+      const isSetup = mode === "setup";
+      $("pinEntryMode").classList.toggle("hidden", isSetup);
+      $("pinSetupMode").classList.toggle("hidden", !isSetup);
+      $("pinScreenTitle").textContent = isSetup ? "Set up your PIN" : "Enter your PIN";
+      $("pinScreenSubtitle").textContent = isSetup
+        ? "For fast access on this device next time"
+        : "Quick unlock for this device";
+      $("pinEntryInput").value = "";
+      $("pinSetupInput").value = "";
+      $("pinConfirmInput").value = "";
+      $("pinEntryError").classList.add("hidden");
+      $("pinSetupError").classList.add("hidden");
+      $("pinSetupCancelRow").classList.toggle("hidden", !(isSetup && allowCancel));
+    }
+    async function proceedAfterAuth(user) {
+      currentUser = user;
+      if (!currentUser.user_metadata?.store_name) {
+        showStoreNameScreen();
+        return;
+      }
+      let savedHash = null;
+      try { savedHash = localStorage.getItem(pinHashKey(currentUser.id)); } catch (e) {}
+      showPinScreen(savedHash ? "entry" : "setup");
+    }
+
+    function customerBalance(c) {
+      return round2((c.utang_entries || []).reduce((n, e) => n + Number(e.amount_remaining || 0), 0));
+    }
+    function getUnpaidEntriesOldestFirst(customer) {
+      return (customer?.utang_entries || [])
+        .filter((e) => Number(e.amount_remaining) > 0)
+        .slice()
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    }
+    function simulateAllocation(entriesOldestFirst, amountPaid) {
+      let remaining = round2(amountPaid);
+      const allocations = [];
+      for (const entry of entriesOldestFirst) {
+        if (remaining <= 0) break;
+        const owed = round2(entry.amount_remaining);
+        const applied = round2(Math.min(owed, remaining));
+        if (applied > 0) {
+          allocations.push({ entry, appliedAmount: applied });
+          remaining = round2(remaining - applied);
+        }
+      }
+      return { allocations, leftover: Math.max(0, round2(remaining)) };
+    }
+    function canAddNewCustomer() {
+      const active = customers.filter((c) => !c.archived);
+      return isProAccount || active.length < FREE_CUSTOMER_LIMIT;
+    }
+
+    function mapProduct(row, soldMap) {
+      return {
+        id: row.id,
+        name: row.name,
+        category: row.category_id,
+        cost: row.cost == null ? null : Number(row.cost),
+        markupPct: row.markup_pct == null ? null : Number(row.markup_pct),
+        price: Number(row.price),
+        stock: row.stock == null ? null : Number(row.stock),
+        archived: !!row.archived,
+        sold: soldMap[row.id] || 0
+      };
+    }
+    function mapSale(row) {
+      const items = (row.sale_items || []).map((it) => ({
+        name: it.name,
+        qty: Number(it.qty),
+        price: Number(it.unit_price),
+        productId: it.product_id,
+        unitCost: it.unit_cost == null ? null : Number(it.unit_cost)
+      }));
+      return {
+        id: row.id,
+        at: new Date(row.sold_at).getTime(),
+        method: row.tender,
+        total: Number(row.amount),
+        tendered: row.cash_tendered == null ? 0 : Number(row.cash_tendered),
+        change: row.change == null ? 0 : Number(row.change),
+        customerId: row.customer_id,
+        receipt: row.receipt_number,
+        items
+      };
+    }
+    function groupPayments(customersList) {
+      const groups = new Map();
+      for (const c of customersList) {
+        for (const p of (c.payments || [])) {
+          const key = (p.receipt_number != null ? String(p.receipt_number) : p.id) + ":" + c.id;
+          if (!groups.has(key)) {
+            const at = p.created_at ? new Date(p.created_at).getTime() : new Date(p.date).getTime();
+            groups.set(key, {
+              id: "pay-" + key,
+              at,
+              method: "collect",
+              total: 0,
+              allocated: 0,
+              tendered: 0,
+              change: 0,
+              customerId: c.id,
+              receipt: p.receipt_number,
+              items: []
+            });
+          }
+          const g = groups.get(key);
+          const amt = Number(p.amount || 0);
+          g.total = round2(g.total + amt);
+          if (p.overpayment_action === "change") {
+            g.change = round2(g.change + Number(p.overpayment_amount || p.amount || 0));
+          } else if (p.overpayment_action === "store_credit") {
+            /* kept as credit, not drawer cash */
+          } else {
+            g.allocated = round2(g.allocated + amt);
+          }
+        }
+      }
+      return [...groups.values()];
+    }
+
+    async function loadAll() {
+      if (!sb || !currentUser) return;
+      const seed = await sb.rpc("ensure_default_categories");
+      if (seed.error) {
+        toast(calmError(seed.error, "Couldn't load categories"));
+      }
+      const [cats, settings, prods, custs, salesRes, itemRows, profile] = await Promise.all([
+        sb.from("categories").select("*").order("sort_order", { ascending: true }),
+        sb.from("store_settings").select("*").eq("owner_id", currentUser.id).maybeSingle(),
+        sb.from("products").select("*").eq("archived", false).order("name", { ascending: true }),
+        sb.from("customers").select("*, utang_entries(*), payments(*)").order("created_at", { ascending: true }),
+        sb.from("sales").select("*, sale_items(*)").order("sold_at", { ascending: false }),
+        sb.from("sale_items").select("product_id, qty"),
+        sb.from("profiles").select("is_pro").eq("id", currentUser.id).maybeSingle()
+      ]);
+      const firstErr = cats.error || settings.error || prods.error || custs.error || salesRes.error || itemRows.error || profile.error;
+      if (firstErr) {
+        toast(calmError(firstErr, "Couldn't load your store. Check your connection."));
+      }
+      CATEGORIES = (cats.data || []).map((c) => ({
+        id: c.id,
+        name: c.name,
+        color: c.color,
+        tint: c.tint,
+        darkColor: c.dark_color,
+        darkTint: c.dark_tint,
+        sort_order: c.sort_order
+      }));
+      if (settings.data && settings.data.default_markup != null) {
+        defaultMarkup = Number(settings.data.default_markup);
+      } else if (!settings.error) {
+        const ins = await sb.from("store_settings").insert({ owner_id: currentUser.id, default_markup: defaultMarkup });
+        if (ins.error && !String(ins.error.message || "").toLowerCase().includes("duplicate")) {
+          /* keep local default */
+        }
+      }
+      const soldMap = {};
+      for (const row of (itemRows.data || [])) {
+        if (!row.product_id) continue;
+        soldMap[row.product_id] = (soldMap[row.product_id] || 0) + Number(row.qty || 0);
+      }
+      products = (prods.data || []).map((row) => mapProduct(row, soldMap));
+      customers = (custs.data || []).filter((c) => !c.archived).map((c) => ({ ...c, balance: customerBalance(c) }));
+      sales = (salesRes.data || []).map(mapSale);
+      paymentsLedger = groupPayments(custs.data || []);
+      isProAccount = !!(profile.data && profile.data.is_pro);
+    }
+
+    async function unlockApp() {
+      STORE_NAME = currentUser?.user_metadata?.store_name || "My Store";
+      hideAllTopLevelScreens();
+      $("app").classList.remove("hidden");
+      unlocked = true;
+      $("searchIco").innerHTML = icon("search");
+      renderNav();
+      await loadAll();
+      render();
+    }
+
+    async function completeSale(method, customerId, tendered) {
+      if (saving) return;
+      const lines = cartLines();
+      if (!lines.length) return;
+      if (method === "utang" && !customerId) return;
+      const total = cartTotal();
+      const change = method === "cash" ? Math.max(0, Number(tendered) - total) : 0;
+      for (const l of lines) {
+        if (l.stock != null && l.qty > l.stock) {
+          toast("Not enough stock for " + l.name);
+          return;
+        }
+      }
+      if (!sb) { toast("Couldn't reach the server"); return; }
+      saving = true;
+      if ($("confirmCash")) $("confirmCash").disabled = true;
+      if ($("confirmCharge")) $("confirmCharge").disabled = true;
+      const items = lines.map((l) => ({
+        product_id: l.id,
+        name: l.name,
+        qty: l.qty,
+        unit_price: l.price,
+        unit_cost: l.cost == null ? null : l.cost
+      }));
+      const { data, error } = await sb.rpc("record_sale", {
+        p_tender: method,
+        p_amount: total,
+        p_items: items,
+        p_customer_id: customerId || null,
+        p_cash_tendered: method === "cash" ? Number(tendered) : null,
+        p_change: method === "cash" ? change : null
+      });
+      saving = false;
+      if (error) {
+        toast(calmError(error, "Couldn't save the sale"));
+        if (sheetName === "cash") renderSheet();
+        if (sheetName === "charge") renderSheet();
+        return;
+      }
+      const rec = {
+        id: data && data.sale_id,
+        at: Date.now(),
+        method,
+        total,
+        tendered: tendered || 0,
+        change: data && data.change != null ? Number(data.change) : change,
+        customerId,
+        receipt: data && data.receipt_number,
+        items: lines.map((l) => ({ name: l.name, qty: l.qty, price: l.price, productId: l.id, unitCost: l.cost == null ? null : l.cost }))
+      };
+      lastReceipt = rec;
+      cart = {};
+      closeSheet();
+      openSheet("receipt");
+      await loadAll();
+      render();
+      const who = method === "utang" ? ((customers.find((x) => x.id === customerId) || {}).name) : null;
+      toast(who ? "Added to " + who + "'s utang" : "Sale saved");
+    }
+
+    async function collectPayment(customerId, amount, action) {
+      if (saving) return;
+      const c = customers.find((x) => x.id === customerId);
+      if (!c || !sb) return;
+      const pay = round2(amount);
+      if (pay <= 0) return;
+      const entries = getUnpaidEntriesOldestFirst(c);
+      const { allocations, leftover } = simulateAllocation(entries, pay);
+      if (leftover > 0 && !action) {
+        toast("Choose what to do with the extra amount");
+        return;
+      }
+      saving = true;
+      if ($("confirmCollect")) $("confirmCollect").disabled = true;
+      const { data: receiptNumber, error: recErr } = await sb.rpc("next_receipt_number");
+      if (recErr) {
+        saving = false;
+        toast(calmError(recErr, "Couldn't get a receipt number"));
+        renderSheet();
+        return;
+      }
+      for (const { entry, appliedAmount } of allocations) {
+        const newRemaining = round2(entry.amount_remaining - appliedAmount);
+        const { error: updateError } = await sb.from("utang_entries").update({ amount_remaining: newRemaining }).eq("id", entry.id);
+        if (updateError) {
+          saving = false;
+          toast(calmError(updateError, "Couldn't update the utang"));
+          await loadAll();
+          render();
+          return;
+        }
+        const { error: payError } = await sb.from("payments").insert({
+          customer_id: c.id,
+          utang_entry_id: entry.id,
+          amount: appliedAmount,
+          date: todayISO(),
+          receipt_number: receiptNumber,
+          is_full_payment: newRemaining === 0
+        });
+        if (payError) {
+          saving = false;
+          toast(calmError(payError, "Couldn't record the payment"));
+          await loadAll();
+          render();
+          return;
+        }
+      }
+      if (leftover > 0) {
+        const { error: overError } = await sb.from("payments").insert({
+          customer_id: c.id,
+          utang_entry_id: null,
+          amount: leftover,
+          date: todayISO(),
+          overpayment_amount: leftover,
+          overpayment_action: action,
+          receipt_number: receiptNumber
+        });
+        if (overError) {
+          saving = false;
+          toast(calmError(overError, "Couldn't record the extra amount"));
+          await loadAll();
+          render();
+          return;
+        }
+        if (action === "store_credit") {
+          await sb.from("customers").update({
+            store_credit_balance: round2((c.store_credit_balance || 0) + leftover)
+          }).eq("id", c.id);
+        }
+      }
+      const rec = {
+        id: "pay-" + receiptNumber,
+        at: Date.now(),
+        method: "collect",
+        total: pay,
+        tendered: pay,
+        change: action === "change" ? leftover : 0,
+        customerId: c.id,
+        receipt: receiptNumber,
+        items: []
+      };
+      lastReceipt = rec;
+      paymentAmount = "";
+      overpayAction = null;
+      saving = false;
+      closeSheet();
+      openSheet("receipt");
+      await loadAll();
+      render();
+      toast("Payment recorded");
+    }
+
+    function activityList() {
+      return sales.concat(paymentsLedger).sort((a, b) => b.at - a.at);
+    }
+    function todaySales() {
+      const start = startOfDay(new Date());
+      return activityList().filter((s) => s.at >= start);
+    }
+    function todayStats() {
+      const list = todaySales();
+      const cash = list.filter((s) => s.method === "cash").reduce((n, s) => n + s.total, 0);
+      const charged = list.filter((s) => s.method === "utang").reduce((n, s) => n + s.total, 0);
+      const collected = list.filter((s) => s.method === "collect").reduce((n, s) => n + (s.allocated != null ? s.allocated : s.total), 0);
+      let profit = 0, soldLines = 0, missingCost = 0;
+      list.filter((s) => s.method === "cash" || s.method === "utang").forEach((s) => {
+        (s.items || []).forEach((it) => {
+          soldLines += 1;
+          if (it.unitCost == null) missingCost += 1;
+          else profit += (it.price - it.unitCost) * it.qty;
+        });
+      });
+      return { cash, charged, collected, inDrawer: cash + collected, count: list.filter((s) => s.method !== "collect").length, profit, missingCost, soldLines };
+    }
+    function dayTotals(days) {
+      const now = new Date();
+      const vals = [];
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const start = startOfDay(d);
+        const end = start + 24 * 60 * 60 * 1000;
+        const amt = activityList()
+          .filter((s) => (s.method === "cash" || s.method === "utang") && s.at >= start && s.at < end)
+          .reduce((n, s) => n + s.total, 0);
+        vals.push(amt);
+      }
+      return vals;
+    }
+
+    function weekChartHTML() {
+      const vals = dayTotals(7);
+      const todayAmt = vals[6];
+      const yest = vals[5];
+      const delta = yest ? Math.round(((todayAmt - yest) / yest) * 100) : null;
+      const max = Math.max(...vals, 1);
+      const W = 310, H = 112, padX = 4, padTop = 6, padBot = 24;
+      const n = 7, gap = 9;
+      const barW = (W - padX * 2 - gap * (n - 1)) / n;
+      const labels = [];
+      const now = new Date();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        labels.push(d.toLocaleDateString("en-PH", { weekday: "narrow" }));
+      }
+      const bars = vals.map((v, i) => {
+        const h = Math.max(5, (v / max) * (H - padTop - padBot));
+        const x = padX + i * (barW + gap);
+        const y = H - padBot - h;
+        const isToday = i === n - 1;
+        return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="5" fill="${isToday ? "var(--chart-today)" : "var(--chart-bar)"}"/>
+          <text x="${(x + barW / 2).toFixed(2)}" y="${H - 7}" text-anchor="middle" fill="${isToday ? "var(--chart-label-today)" : "var(--chart-label)"}" font-size="11" font-weight="${isToday ? 650 : 500}" font-family="Pretendard, sans-serif">${labels[i]}</text>`;
+      }).join("");
+      const weekTotal = vals.reduce((a, b) => a + b, 0);
+      const badge = delta == null ? "" : `<div class="trend ${delta >= 0 ? "up" : "down"}">${delta >= 0 ? "Up" : "Down"} ${Math.abs(delta)}% from yesterday</div>`;
+      return `<div class="week-card">
+        <div class="week-head">
+          <div>
+            <div class="stat-label">This week</div>
+            <div class="week-total">${peso(weekTotal)}</div>
+          </div>
+          ${badge}
+        </div>
+        <svg class="week-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${bars}</svg>
+      </div>`;
+    }
+
+    function renderToday() {
+      const st = todayStats();
+      const list = todaySales();
+      const profitNote = st.missingCost ? "On items with a cost" : "Sales minus cost";
+      $("pageToday").innerHTML = `
+        ${weekChartHTML()}
+        <div class="stats">
+          <div class="stat"><div class="stat-label">Cash sales</div><div class="stat-value">${peso(st.cash)}</div></div>
+          <div class="stat"><div class="stat-label">Charged to utang</div><div class="stat-value">${peso(st.charged)}</div></div>
+          <div class="stat"><div class="stat-label">Collected</div><div class="stat-value">${peso(st.collected)}</div></div>
+          <div class="stat"><div class="stat-label">In the drawer</div><div class="stat-value">${peso(st.inDrawer)}</div></div>
+          <div class="stat wide"><div class="stat-label">${profitNote}</div><div class="stat-value profit">${peso(st.profit)}</div></div>
+        </div>
+        <div class="section-label">Activity</div>
+        <div class="list">${list.map((s) => {
+          const who = s.customerId ? (customers.find((c) => c.id === s.customerId) || {}).name : "Walk-in";
+          const label = s.method === "cash" ? "Cash" : s.method === "utang" ? "Utang · " + who : "Payment · " + who;
+          const time = new Date(s.at).toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" });
+          const num = s.receipt != null ? " · #" + s.receipt : "";
+          return `<div class="row"><div><div class="row-title">${escapeHtml(label)}</div><div class="row-sub">${time}${num}</div></div><div class="row-amt">${peso(s.total)}</div></div>`;
+        }).join("") || `<div class="empty">Sales will show up here after your first sale</div>`}</div>`;
+    }
+
+    function render() {
+      const titles = {
+        sell: ["Today", STORE_NAME],
+        utang: ["Balances", "Utang"],
+        products: ["Price and cost", "Items"],
+        today: ["Summary", "Today"]
+      };
+      $("topEyebrow").textContent = titles[tab][0];
+      $("topTitle").textContent = titles[tab][1];
+      const st = todayStats();
+      const pill = $("topPill");
+      pill.dataset.open = "settings";
+      if (tab === "products") pill.textContent = "Markup " + defaultMarkup + "%";
+      else if (tab === "today") pill.textContent = "Store";
+      else pill.textContent = peso(st.inDrawer) + " in drawer";
+
+      $("searchWrap").classList.toggle("hidden", tab === "today");
+      $("search").placeholder = tab === "utang" ? "Search customers" : tab === "products" ? "Search items" : "Search products";
+      const showCats = tab === "sell";
+      $("catWrap").classList.toggle("hidden", !showCats);
+      if (showCats) $("catScroller").innerHTML = renderCatChips(selectedCategory, "data-cat");
+
+      ["sell","utang","products","today"].forEach((t) => {
+        $("page" + t[0].toUpperCase() + t.slice(1)).classList.toggle("hidden", tab !== t);
+      });
+
+      const hasCart = tab === "sell" && cartCount() > 0;
+      $("pageSell").classList.toggle("has-cart", hasCart);
+      $("cartBar").classList.toggle("hidden", !hasCart);
+      if (hasCart) {
+        $("cartBar").innerHTML = `<span>${cartCount()} ${cartCount() === 1 ? "item" : "items"}</span><strong>${peso(cartTotal())}${icon("bag")}</strong>`;
+      }
+
+      renderSell();
+      renderUtang();
+      renderProducts();
+      renderToday();
+      if (sheetName) renderSheet();
+      syncToasterPos();
+      updateCatFade();
+    }
+
+    function blankDraft(name, addToCart) {
+      return {
+        mode: "add",
+        id: null,
+        name: name || "",
+        cost: "",
+        markup: String(defaultMarkup),
+        price: "",
+        stock: "",
+        priceManual: false,
+        addToCart: !!addToCart,
+        confirmDelete: false,
+        category: ((CATEGORIES.find((c) => c.name === "Others") || {}).id) || null
+      };
+    }
+    function draftFromProduct(p) {
+      const cost = p.cost;
+      const implied = (cost != null && cost > 0) ? ((p.price - cost) / cost) * 100 : null;
+      return {
+        mode: "edit",
+        id: p.id,
+        name: p.name,
+        cost: cost == null ? "" : String(cost),
+        markup: implied != null ? fmtPct(implied) : String(defaultMarkup),
+        price: String(p.price),
+        stock: p.stock == null ? "" : String(p.stock),
+        priceManual: true,
+        addToCart: false,
+        confirmDelete: false,
+        category: p.category || ((CATEGORIES.find((c) => c.name === "Others") || {}).id) || null
+      };
+    }
+    function applyAutoPrice(d) {
+      if (d.priceManual) return;
+      const cost = numOrNull(d.cost);
+      const markup = numOrNull(d.markup);
+      if (cost == null || markup == null) return;
+      d.price = String(roundUpPeso(cost * (1 + markup / 100)));
+    }
+    function priceHint(d) {
+      const cost = numOrNull(d.cost);
+      const price = numOrNull(d.price);
+      const markup = numOrNull(d.markup);
+      if (price == null || price <= 0) return "";
+      if (cost == null) return "";
+      const profit = price - cost;
+      if (d.priceManual) {
+        const actual = cost > 0 ? fmtPct(((price - cost) / cost) * 100) : null;
+        return `<div class="hint-box manual">Actual markup ${actual == null ? "—" : actual + "%"} · Profit ${peso(profit)}</div>`;
+      }
+      if (markup != null) {
+        const raw = cost * (1 + markup / 100);
+        const rounded = raw - Math.floor(raw) > 1e-9;
+        const rawLabel = "₱\u202f" + (Math.round(raw * 100) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const extra = rounded ? `Rounded up from ${rawLabel}. ` : "";
+        return `<div class="hint-box">${extra}Markup ${fmtPct(markup)}% · Profit ${peso(profit)}</div>`;
+      }
+      return `<div class="hint-box">Profit ${peso(profit)}</div>`;
+    }
+    async function saveDraft() {
+      if (!itemDraft || saving || !sb) return;
+      applyAutoPrice(itemDraft);
+      const name = (itemDraft.name || "").trim();
+      const price = numOrNull(itemDraft.price);
+      if (!name || !(price > 0)) return;
+      const cost = numOrNull(itemDraft.cost);
+      const markup = numOrNull(itemDraft.markup);
+      const stock = numOrNull(itemDraft.stock);
+      const payload = {
+        name,
+        category_id: (!itemDraft.category || itemDraft.category === "others")
+          ? (((CATEGORIES.find((c) => c.name === "Others") || {}).id) || null)
+          : itemDraft.category,
+        cost,
+        markup_pct: markup,
+        price,
+        stock
+      };
+      saving = true;
+      if ($("saveItem")) $("saveItem").disabled = true;
+      let error;
+      if (itemDraft.mode === "edit" && itemDraft.id) {
+        ({ error } = await sb.from("products").update(payload).eq("id", itemDraft.id));
+      } else {
+        payload.owner_id = currentUser.id;
+        ({ error } = await sb.from("products").insert(payload).select("id").single().then((r) => {
+          if (r.data && itemDraft.addToCart) itemDraft._newId = r.data.id;
+          return r;
+        }));
+      }
+      saving = false;
+      if (error) {
+        toast(calmError(error, "Couldn't save the item"));
+        renderSheet();
+        return;
+      }
+      const addToCart = itemDraft.addToCart;
+      const newId = itemDraft._newId;
+      const savedName = name;
+      closeSheet();
+      itemDraft = null;
+      await loadAll();
+      if (addToCart) {
+        const p = products.find((x) => x.id === newId) || products.find((x) => x.name === savedName);
+        if (p) addToCartItem(p.id);
+      }
+      render();
+      toast("Item saved");
+    }
+    function addToCartItem(id) { addToCart(id); }
+
+    async function deleteDraft() {
+      if (!itemDraft || !itemDraft.id || saving || !sb) return;
+      saving = true;
+      const { error } = await sb.from("products").delete().eq("id", itemDraft.id);
+      saving = false;
+      if (error) {
+        toast(calmError(error, "Couldn't delete the item"));
+        renderSheet();
+        return;
+      }
+      if (cart[itemDraft.id]) delete cart[itemDraft.id];
+      itemDraft = null;
+      closeSheet();
+      await loadAll();
+      render();
+      toast("Item deleted");
+    }
+
+    function openAddItem(name, addToCartAfter) {
+      itemDraft = blankDraft(name, addToCartAfter);
+      openSheet("itemForm");
+    }
+    function openEditItem(id) {
+      const p = products.find((x) => x.id === id);
+      if (!p) return;
+      itemDraft = draftFromProduct(p);
+      openSheet("itemForm");
+    }
+
+    function setTab(next) {
+      tab = next;
+      query = "";
+      $("search").value = "";
+      if (next !== "sell" && next !== "utang" && next !== "products") closeSheet();
+      document.querySelectorAll(".nav button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+      render();
+    }
+    function renderSell() {
+      const typed = query.trim();
+      const scoped = products.filter(inCategory);
+      if (!typed) {
+        if (!scoped.length) {
+          $("pageSell").innerHTML = `<div class="empty">No items in this category</div>`;
+          return;
+        }
+        const frequent = [...scoped].sort((a, b) => (b.sold || 0) - (a.sold || 0) || a.name.localeCompare(b.name)).slice(0, 4);
+        const freqIds = new Set(frequent.map((p) => p.id));
+        const rest = scoped.filter((p) => !freqIds.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
+        if (selectedCategory !== "all") {
+          const catName = (catById(selectedCategory) || {}).name || "Items";
+          $("pageSell").innerHTML = `
+            <div class="sec-label">${escapeHtml(catName)}</div>
+            <div class="grid">${frequent.concat(rest).map((p) => renderTile(p)).join("")}</div>`;
+          return;
+        }
+        $("pageSell").innerHTML = `
+          <div class="sec-label">Frequent</div>
+          <div class="grid">${frequent.map((p) => renderTile(p)).join("")}</div>
+          ${rest.length ? `<div class="sec-label later">All items</div><div class="grid">${rest.map((p) => renderTile(p)).join("")}</div>` : ""}`;
+        return;
+      }
+      const scored = scoped.map((p) => ({ p, m: matchQuery(p.name, typed) })).filter((x) => x.m.ok);
+      scored.sort((a, b) => a.m.rank - b.m.rank || a.p.name.localeCompare(b.p.name));
+      if (!scored.length) {
+        $("pageSell").innerHTML = `<div class="sell-miss"><p>No match for “${escapeHtml(typed)}”</p><button class="btn btn-primary" type="button" id="addFromSearch">${withIcon("plus", "Add " + escapeHtml(typed))}</button></div>`;
+        return;
+      }
+      $("pageSell").innerHTML = `<div class="grid">${scored.map((x) => renderTile(x.p, x.m.html)).join("")}</div>`;
+    }
+
+    function renderUtang() {
+      const q = query.trim().toLowerCase();
+      const list = customers.filter((c) => !q || c.name.toLowerCase().includes(q));
+      const totalDue = customers.reduce((n, c) => n + c.balance, 0);
+      $("pageUtang").innerHTML = `
+        <div class="stat wide" style="margin-bottom:12px">
+          <div class="stat-label">Still owed to you</div>
+          <div class="stat-value">${peso(totalDue)}</div>
+        </div>
+        <div class="list">${list.map((c) => `
+          <button class="row cust" type="button" data-open-cust="${c.id}">
+            <div><div class="row-title">${escapeHtml(c.name)}</div><div class="row-sub">${c.balance ? "Open utang" : "No balance"}</div></div>
+            <div class="row-amt ${c.balance ? "due" : ""}">${peso(c.balance)}</div>
+          </button>`).join("")}</div>
+        <button class="btn fab-add" type="button" id="addCustomerBtn">${withIcon("plus", "Add customer")}</button>`;
+    }
+
+    function renderProducts() {
+      const q = query.trim().toLowerCase();
+      if (!products.length) {
+        $("pageProducts").innerHTML = renderQuickStart();
+        return;
+      }
+      const list = products.filter((p) => !q || p.name.toLowerCase().includes(q));
+      $("pageProducts").innerHTML = `
+        <div class="list">${list.map((p) => {
+          const profit = p.cost != null ? p.price - p.cost : null;
+          const sub = [
+            p.cost != null ? "Cost " + peso(p.cost) : null,
+            profit != null ? "Profit " + peso(profit) : null,
+            p.stock == null ? "Stock not tracked" : p.stock + " in stock"
+          ].filter(Boolean).join(" · ");
+          const cat = catById(p.category);
+          const swatch = cat ? `<span class="swatch" style="${catVars(cat)}"></span>` : "";
+          return `<button class="row" type="button" data-edit-item="${p.id}">
+            <div><div class="row-title">${swatch}${escapeHtml(p.name)}</div><div class="row-sub">${sub}</div></div>
+            <div class="row-amt">${peso(p.price)}</div>
+          </button>`;
+        }).join("") || `<div class="empty">No matching items</div>`}</div>
+        <button class="btn fab-add" type="button" id="addProductBtn">${withIcon("plus", "Add item")}</button>
+        <button class="btn btn-ghost" style="width:100%" type="button" id="openQuickStart">Add common items</button>`;
+    }
+
+    function renderQuickStart() {
+      return `<div class="quick-block">
+        <p class="empty-lead">Start with what you already sell. Tap the items, then add a cost or a price.</p>
+        <div class="chips">${COMMON_ITEMS.map((name) => {
+          const on = quickSelected.has(name);
+          return `<button class="chip${on ? " on" : ""}" type="button" data-toggle-common="${escapeHtml(name)}">${escapeHtml(name)}</button>`;
+        }).join("")}</div>
+        <button class="btn btn-primary" style="width:100%" type="button" id="continueQuick" ${quickSelected.size ? "" : "disabled"}>
+          Continue${quickSelected.size ? " · " + quickSelected.size : ""}
+        </button>
+        <button class="btn fab-add" type="button" id="addProductBtn">${withIcon("plus", "Add a different item")}</button>
+      </div>`;
+    }
+    function renderSheet() {
+      const el = $("sheet");
+      if (sheetName === "cart") el.innerHTML = cartHTML();
+      else if (sheetName === "cash") el.innerHTML = cashHTML();
+      else if (sheetName === "charge") el.innerHTML = chargeHTML();
+      else if (sheetName === "receipt") el.innerHTML = receiptHTML();
+      else if (sheetName === "customer") el.innerHTML = customerHTML();
+      else if (sheetName === "addCustomer") el.innerHTML = addCustomerHTML();
+      else if (sheetName === "itemForm") el.innerHTML = itemFormHTML();
+      else if (sheetName === "settings") el.innerHTML = settingsHTML();
+      else if (sheetName === "quickPrices") el.innerHTML = quickPricesHTML();
+      else if (sheetName === "limit") el.innerHTML = limitHTML();
+    }
+
+    function cartHTML() {
+      const lines = cartLines();
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">${confirmClearCart ? "Clear cart?" : "Cart"}</h2>
+        <p class="sheet-sub">${confirmClearCart ? "This removes all items from the cart." : (cartCount() + " " + (cartCount() === 1 ? "item" : "items"))}</p>
+        ${lines.map((l) => `<div class="cart-line">
+          <div><div class="row-title">${escapeHtml(l.name)}</div><div class="row-sub">${peso(l.price)} each</div></div>
+          <div class="stepper">
+            <button type="button" data-qty="${l.id}:${l.qty - 1}">−</button>
+            <div class="n">${l.qty}</div>
+            <button type="button" data-qty="${l.id}:${l.qty + 1}">+</button>
+          </div>
+        </div>`).join("")}
+        <div class="total-row"><span>Total</span><strong>${peso(cartTotal())}</strong></div>
+        ${confirmClearCart ? `
+        <div class="btn-row">
+          <button class="btn btn-secondary" type="button" id="cancelClearCart">Keep cart</button>
+          <button class="btn btn-danger" type="button" id="confirmClearCart" style="margin-top:0">Clear cart</button>
+        </div>` : `
+        <div class="btn-row">
+          <button class="btn btn-secondary" type="button" id="goCharge">Charge to utang</button>
+          <button class="btn btn-primary" type="button" id="goCash">Pay cash</button>
+        </div>
+        <button class="btn btn-ghost" style="width:100%" type="button" id="askClearCart">Clear cart</button>`}`;
+    }
+
+    function cashHTML() {
+      const total = cartTotal();
+      const tender = cashTendered;
+      const enough = tender != null && tender >= total;
+      const exact = tender === total;
+      const short = tender != null && tender < total;
+      const change = enough ? tender - total : 0;
+      const presets = [total, 50, 100, 200, 500, 1000].filter((v, i, a) => a.indexOf(v) === i && v >= total);
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">Pay cash</h2>
+        <p class="sheet-sub">Total ${peso(total)}</p>
+        <div class="tender">${presets.map((v) => `<button type="button" class="${tender === v ? "on" : ""}" data-tender="${v}">${v === total ? "Exact" : peso(v)}</button>`).join("")}</div>
+        <input class="cash-input" id="tenderInput" type="number" inputmode="decimal" placeholder="Amount received" value="${tender == null ? "" : tender}" />
+        <div class="change-box ${short ? "short" : ""}">
+          <div class="lbl">${short ? "Still short" : exact ? "Exact amount" : tender == null ? "Change" : "Change"}</div>
+          <div class="val">${tender == null ? "—" : short ? peso(total - tender) : peso(change)}</div>
+        </div>
+        <button class="btn btn-primary" style="width:100%" type="button" id="confirmCash" ${enough ? "" : "disabled"}>Confirm payment</button>`;
+    }
+
+    function chargeHTML() {
+      const total = cartTotal();
+      if (selectedCustomer) {
+        const c = customers.find((x) => x.id === selectedCustomer);
+        return `<div class="handle"></div>
+          <h2 class="sheet-title">Charge to utang</h2>
+          <p class="sheet-sub">${escapeHtml(c.name)}</p>
+          <div class="confirm-note">
+            Charge ${peso(total)} today.<br/>
+            Current balance ${peso(c.balance)}.<br/>
+            New balance ${peso(c.balance + total)}.
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-secondary" type="button" id="backCharge">${withIcon("back", "Back")}</button>
+            <button class="btn btn-primary" type="button" id="confirmCharge">Confirm utang</button>
+          </div>`;
+      }
+      const q = (document.getElementById("chargeSearch") || {}).value || "";
+      const list = customers.filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()));
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">Charge to utang</h2>
+        <p class="sheet-sub">Total ${peso(total)}</p>
+        <input class="search" id="chargeSearch" type="search" placeholder="Search customers" value="${escapeHtml(q)}" style="margin-bottom:12px" />
+        <div class="list">${list.map((c) => `
+          <button class="row cust" type="button" data-pick-cust="${c.id}">
+            <div><div class="row-title">${escapeHtml(c.name)}</div><div class="row-sub">Current balance</div></div>
+            <div class="row-amt ${c.balance ? "due" : ""}">${peso(c.balance)}</div>
+          </button>`).join("")}</div>`;
+    }
+    function receiptHTML() {
+      const r = lastReceipt;
+      if (!r) return "";
+      const who = r.customerId ? (customers.find((c) => c.id === r.customerId) || {}).name : "Walk-in";
+      const method = r.method === "cash" ? "Cash" : r.method === "utang" ? "Utang · " + who : "Payment · " + who;
+      const time = new Date(r.at).toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+      const num = r.receipt != null ? "#" + r.receipt + " · " : "";
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">Receipt</h2>
+        <p class="sheet-sub">${num}${time}</p>
+        <div class="receipt">
+          <h3>${escapeHtml(STORE_NAME)}</h3>
+          <div class="meta">${escapeHtml(method)}</div>
+          ${(r.items || []).map((it) => `<div class="line"><span>${it.qty} × ${escapeHtml(it.name)}</span><span>${peso(it.qty * it.price)}</span></div>`).join("")}
+          <div class="line sum"><span>Total</span><span>${peso(r.total)}</span></div>
+          ${r.method === "cash" ? `<div class="line"><span>Received</span><span>${peso(r.tendered)}</span></div><div class="line"><span>Change</span><span>${peso(r.change)}</span></div>` : ""}
+          ${r.method === "collect" && r.change ? `<div class="line"><span>Change</span><span>${peso(r.change)}</span></div>` : ""}
+        </div>
+        <button class="btn btn-primary" style="width:100%" type="button" id="doneReceipt">Done</button>`;
+    }
+
+    function customerHistory(c) {
+      const rows = [];
+      for (const s of sales.filter((x) => x.customerId === c.id)) {
+        rows.push({ at: s.at, label: s.method === "utang" ? "Charged" : "Cash", total: s.total });
+      }
+      for (const p of paymentsLedger.filter((x) => x.customerId === c.id)) {
+        rows.push({ at: p.at, label: "Payment", total: p.total });
+      }
+      for (const e of (c.utang_entries || [])) {
+        const hasSale = sales.some((s) => s.customerId === c.id && s.receipt === e.receipt_number && s.method === "utang");
+        if (hasSale) continue;
+        rows.push({ at: new Date(e.created_at).getTime(), label: e.entry_number ? "Entry #" + e.entry_number : "Utang", total: Number(e.total_amount) });
+      }
+      rows.sort((a, b) => b.at - a.at);
+      return rows.slice(0, 20);
+    }
+
+    function customerHTML() {
+      const c = customers.find((x) => x.id === selectedCustomer);
+      if (!c) return "";
+      const hist = customerHistory(c);
+      const pay = numOrNull(paymentAmount);
+      const leftover = pay != null && c.balance > 0 ? round2(pay - c.balance) : 0;
+      const canPay = pay != null && pay > 0 && (leftover <= 0 || !!overpayAction);
+      let extra = "";
+      if (c.balance && leftover > 0) {
+        extra = `<div class="overpay"><p>This is ${peso(leftover)} more than the balance.</p>
+          <div class="seg seg-tight" role="radiogroup" aria-label="Extra amount">
+            <button type="button" role="radio" aria-checked="${overpayAction === "store_credit" ? "true" : "false"}" data-overpay="store_credit" class="${overpayAction === "store_credit" ? "on" : ""}">Keep as store credit</button>
+            <button type="button" role="radio" aria-checked="${overpayAction === "change" ? "true" : "false"}" data-overpay="change" class="${overpayAction === "change" ? "on" : ""}">Give as change</button>
+          </div></div>`;
+      }
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">${escapeHtml(c.name)}</h2>
+        <p class="sheet-sub">Balance ${peso(c.balance)}</p>
+        ${c.balance ? `<input class="cash-input" id="payInput" type="number" inputmode="decimal" placeholder="Amount to collect" value="${escapeHtml(paymentAmount)}" />
+        ${extra}
+        <button class="btn btn-primary" style="width:100%;margin-bottom:16px" type="button" id="confirmCollect" ${canPay && !saving ? "" : "disabled"}>Record payment</button>` : ""}
+        <div class="section-label">Recent</div>
+        <div class="list">${hist.length ? hist.map((s) => {
+          return `<div class="row"><div class="row-title">${escapeHtml(s.label)}</div><div class="row-amt">${peso(s.total)}</div></div>`;
+        }).join("") : `<div class="empty">No activity yet</div>`}</div>`;
+    }
+
+    function addCustomerHTML() {
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">Add customer</h2>
+        <p class="sheet-sub">Name only is enough to start.</p>
+        <input class="cash-input" id="newCustName" placeholder="Customer name" />
+        <button class="btn btn-primary" style="width:100%" type="button" id="saveCustomer">Save</button>`;
+    }
+
+    function itemFormHTML() {
+      const d = itemDraft;
+      if (!d) return "";
+      if (d.confirmDelete) {
+        return `<div class="handle"></div>
+          <h2 class="sheet-title">Delete ${escapeHtml(d.name)}?</h2>
+          <p class="sheet-sub">This removes it from your list. Past sales stay as they are.</p>
+          <div class="btn-row">
+            <button class="btn btn-secondary" type="button" id="cancelDelete">Keep item</button>
+            <button class="btn btn-danger" type="button" id="confirmDelete" style="margin-top:0">Delete item</button>
+          </div>`;
+      }
+      applyAutoPrice(d);
+      const title = d.mode === "edit" ? "Edit item" : "Add item";
+      const sub = d.addToCart ? "Saves and adds it to the cart." : (d.mode === "edit" ? "Update price, cost, or stock." : "Cost and markup can fill the price.");
+      const canSave = (d.name || "").trim() && numOrNull(d.price) > 0;
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">${title}</h2>
+        <p class="sheet-sub">${sub}</p>
+        <label class="field"><span>Name</span><input id="itemName" value="${escapeHtml(d.name)}" autocomplete="off" /></label>
+        <div class="section-label">Category</div>
+        <div class="chips cat-pick">${CATEGORIES.map((c) => {
+          const on = d.category === c.id;
+          return `<button class="cat-chip${on ? " on" : ""}" type="button" data-item-cat="${c.id}" style="${catVars(c)}"><span class="swatch"></span>${escapeHtml(c.name)}</button>`;
+        }).join("")}</div>
+        <div class="field-row">
+          <label class="field"><span>Cost</span><input id="itemCost" type="number" inputmode="decimal" placeholder="Optional" value="${escapeHtml(d.cost)}" /></label>
+          <label class="field"><span>Markup %</span><input id="itemMarkup" type="number" inputmode="decimal" value="${escapeHtml(d.markup)}" /></label>
+        </div>
+        <label class="field"><span>Price</span><input id="itemPrice" type="number" inputmode="decimal" value="${escapeHtml(d.price)}" /></label>
+        <label class="field"><span>Stock</span><input id="itemStock" type="number" inputmode="numeric" placeholder="Optional" value="${escapeHtml(d.stock)}" /></label>
+        ${priceHint(d)}
+        <button class="btn btn-primary" style="width:100%" type="button" id="saveItem" ${canSave ? "" : "disabled"}>Save</button>
+        ${d.mode === "edit" ? `<button class="btn btn-danger" type="button" id="askDelete">Delete item</button>` : ""}`;
+    }
+    function settingsHTML() {
+      const pref = getThemePref();
+      const opt = (id, label) => `<button type="button" role="radio" aria-checked="${pref === id ? "true" : "false"}" data-theme-pref="${id}" class="${pref === id ? "on" : ""}">${label}</button>`;
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">Store</h2>
+        <p class="sheet-sub">Appearance, markup, and account.</p>
+        <div class="section-label">Appearance</div>
+        <div class="seg" role="radiogroup" aria-label="Appearance">
+          ${opt("system", "System")}${opt("light", "Light")}${opt("dark", "Dark")}
+        </div>
+        <label class="field"><span>Store name</span><input id="settingsStoreName" value="${escapeHtml(STORE_NAME)}" maxlength="80" /></label>
+        <button class="btn btn-secondary" style="width:100%;margin-bottom:16px" type="button" id="saveStoreName">Save store name</button>
+        <label class="field"><span>Default markup %</span><input id="defaultMarkupInput" type="number" inputmode="decimal" value="${defaultMarkup}" /></label>
+        <button class="btn btn-primary" style="width:100%" type="button" id="saveSettings">Save markup</button>
+        <button class="btn btn-ghost" style="width:100%" type="button" id="changePinBtn">Change PIN</button>
+        <button class="btn btn-ghost" style="width:100%" type="button" id="logoutBtn">Log out</button>`;
+    }
+    function limitHTML() {
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">Customer limit</h2>
+        <p class="sheet-sub">Free accounts can track ${FREE_CUSTOMER_LIMIT} customers. Message Tech Sari if you need more.</p>
+        <div class="btn-row">
+          <button class="btn btn-secondary" type="button" id="limitNotNow">Not now</button>
+          <button class="btn btn-primary" type="button" id="messageTechSari" style="margin-top:0">Message Tech Sari</button>
+        </div>`;
+    }
+    function quickPricesHTML() {
+      if (!quickRows) return "";
+      return `<div class="handle"></div>
+        <h2 class="sheet-title">Set prices</h2>
+        <p class="sheet-sub">Cost or price is enough. Empty rows are skipped.</p>
+        ${quickRows.map((row, i) => `
+          <div class="section-label">${escapeHtml(row.name)}</div>
+          <div class="field-row">
+            <label class="field"><span>Cost</span><input data-qcost="${i}" type="number" inputmode="decimal" placeholder="Optional" value="${escapeHtml(row.cost)}" /></label>
+            <label class="field"><span>Price</span><input data-qprice="${i}" type="number" inputmode="decimal" value="${escapeHtml(row.price)}" /></label>
+          </div>
+        `).join("")}
+        <button class="btn btn-primary" style="width:100%" type="button" id="saveQuick">Save items</button>`;
+    }
+    function restoreFocus(id) {
+      const el = $(id);
+      if (!el) return;
+      const pos = el.selectionStart;
+      el.focus();
+      if (typeof pos === "number") try { el.setSelectionRange(pos, pos); } catch (e) {}
+    }
+
+    function restoreFocusAttr(attr, i) {
+      const el = document.querySelector(`[${attr}="${i}"]`);
+      if (!el) return;
+      const pos = el.selectionStart;
+      el.focus();
+      if (typeof pos === "number") try { el.setSelectionRange(pos, pos); } catch (err) {}
+    }
+
+    async function saveMarkup() {
+      const n = numOrNull($("defaultMarkupInput").value);
+      if (n == null || n < 0) { toast("Enter a markup of 0 or more"); return; }
+      if (!sb || !currentUser) return;
+      saving = true;
+      const { error } = await sb.from("store_settings").upsert({
+        owner_id: currentUser.id,
+        default_markup: n,
+        updated_at: new Date().toISOString()
+      });
+      saving = false;
+      if (error) { toast(calmError(error, "Couldn't save the markup")); return; }
+      defaultMarkup = n;
+      closeSheet();
+      render();
+      toast("Markup saved");
+    }
+    async function saveStoreName() {
+      const name = (($("settingsStoreName") || {}).value || "").trim();
+      if (!name) { toast("Store name cannot be empty"); return; }
+      if (!sb) return;
+      const { error } = await sb.auth.updateUser({ data: { store_name: name } });
+      if (error) { toast(calmError(error, "Couldn't update the store name")); return; }
+      STORE_NAME = name;
+      if (currentUser) currentUser.user_metadata = { ...currentUser.user_metadata, store_name: name };
+      render();
+      toast("Store name updated");
+    }
+    async function saveCustomer() {
+      const name = (($("newCustName") || {}).value || "").trim();
+      if (!name) return;
+      if (!canAddNewCustomer()) { openSheet("limit"); return; }
+      if (!sb) return;
+      saving = true;
+      const { error } = await sb.from("customers").insert({ name });
+      saving = false;
+      if (error) { toast(calmError(error, "Couldn't add the customer")); return; }
+      closeSheet();
+      await loadAll();
+      render();
+      toast("Customer added");
+    }
+    async function saveQuickItems() {
+      if (!quickRows || !sb || !currentUser) return;
+      const others = CATEGORIES.find((c) => c.name === "Others");
+      const rows = [];
+      for (const row of quickRows) {
+        let price = numOrNull(row.price);
+        const cost = numOrNull(row.cost);
+        if (price == null && cost != null) price = roundUpPeso(cost * (1 + defaultMarkup / 100));
+        if (price == null || price <= 0) continue;
+        const markupPct = (cost != null && cost > 0) ? ((price - cost) / cost) * 100 : defaultMarkup;
+        rows.push({
+          owner_id: currentUser.id,
+          name: row.name,
+          category_id: others ? others.id : null,
+          cost,
+          markup_pct: markupPct,
+          price,
+          stock: null
+        });
+      }
+      if (!rows.length) { toast("Add a cost or a price to at least one item"); return; }
+      saving = true;
+      const { error } = await sb.from("products").insert(rows);
+      saving = false;
+      if (error) { toast(calmError(error, "Couldn't save those items")); return; }
+      quickRows = null;
+      quickSelected = new Set();
+      closeSheet();
+      await loadAll();
+      render();
+      toast(rows.length === 1 ? "Item saved" : rows.length + " items saved");
+    }
+
+    function clicked(e, id) {
+      return !!(e.target.closest && e.target.closest("#" + id));
+    }
+    document.addEventListener("click", (e) => {
+      const add = e.target.closest("[data-add]");
+      if (add) addToCart(add.getAttribute("data-add"));
+      const tabBtn = e.target.closest("[data-tab]");
+      if (tabBtn) setTab(tabBtn.getAttribute("data-tab"));
+      if (e.target.closest && e.target.closest(".toast-x")) { dismissToast(); return; }
+      if (clicked(e, "cartBar")) { if (!sheetName) openSheet("cart"); }
+      if (clicked(e, "overlay")) { if (sheetName !== "receipt") closeSheet(); }
+      if (clicked(e, "topPill") && (e.target.closest("#topPill") || {}).dataset && e.target.closest("#topPill").dataset.open === "settings") openSheet("settings");
+      if (clicked(e, "goCash")) { cashTendered = null; openSheet("cash"); }
+      if (clicked(e, "goCharge")) { selectedCustomer = null; openSheet("charge"); }
+      if (clicked(e, "confirmCash") && cashTendered >= cartTotal()) completeSale("cash", null, cashTendered);
+      if (clicked(e, "backCharge")) { selectedCustomer = null; renderSheet(); }
+      if (clicked(e, "confirmCharge") && selectedCustomer) completeSale("utang", selectedCustomer, 0);
+      if (clicked(e, "doneReceipt")) closeSheet();
+      if (clicked(e, "confirmCollect")) collectPayment(selectedCustomer, Number(paymentAmount), leftoverAction());
+      if (clicked(e, "addCustomerBtn")) {
+        if (!canAddNewCustomer()) openSheet("limit");
+        else openSheet("addCustomer");
+      }
+      if (clicked(e, "addProductBtn")) openAddItem("", false);
+      if (clicked(e, "addFromSearch")) openAddItem(query.trim(), true);
+      const catBtn = e.target.closest("[data-cat]");
+      if (catBtn) { selectedCategory = catBtn.getAttribute("data-cat"); render(); }
+      const itemCat = e.target.closest("[data-item-cat]");
+      if (itemCat && itemDraft) { itemDraft.category = itemCat.getAttribute("data-item-cat"); renderSheet(); }
+      if (clicked(e, "saveItem")) saveDraft();
+      if (clicked(e, "askClearCart")) { confirmClearCart = true; renderSheet(); }
+      if (clicked(e, "cancelClearCart")) { confirmClearCart = false; renderSheet(); }
+      if (clicked(e, "confirmClearCart")) { cart = {}; confirmClearCart = false; closeSheet(); render(); }
+      if (clicked(e, "askDelete")) { itemDraft.confirmDelete = true; renderSheet(); }
+      if (clicked(e, "cancelDelete")) { itemDraft.confirmDelete = false; renderSheet(); }
+      if (clicked(e, "confirmDelete")) deleteDraft();
+      const themeBtn = e.target.closest("[data-theme-pref]");
+      if (themeBtn) setThemePref(themeBtn.getAttribute("data-theme-pref"));
+      if (clicked(e, "saveSettings")) saveMarkup();
+      if (clicked(e, "saveStoreName")) saveStoreName();
+      if (clicked(e, "changePinBtn")) { closeSheet(); showPinScreen("setup", true); }
+      if (clicked(e, "logoutBtn")) {
+        closeSheet();
+        sb.auth.signOut().then(() => {
+          currentUser = null;
+          unlocked = false;
+          products = []; customers = []; sales = []; paymentsLedger = []; cart = {};
+          showAuthScreen();
+        });
+      }
+      if (clicked(e, "limitNotNow")) closeSheet();
+      if (clicked(e, "messageTechSari")) window.open(TECHSARI_FB, "_blank", "noopener");
+      if (clicked(e, "openQuickStart")) {
+        quickSelected = new Set();
+        openSheet("quickPick");
+        $("sheet").innerHTML = `<div class="handle"></div>
+          <h2 class="sheet-title">Common items</h2>
+          <p class="sheet-sub">Tap what you sell, then add a cost or a price.</p>
+          <div class="chips" id="quickSheetChips">${COMMON_ITEMS.filter((n) => !products.some((p) => p.name === n)).map((name) =>
+            `<button class="chip" type="button" data-toggle-sheet="${escapeHtml(name)}">${escapeHtml(name)}</button>`
+          ).join("")}</div>
+          <button class="btn btn-primary" style="width:100%" type="button" id="continueQuickSheet" disabled>Continue</button>`;
+        sheetName = "quickPick";
+      }
+      const tsheet = e.target.closest("[data-toggle-sheet]");
+      if (tsheet && sheetName === "quickPick") {
+        const name = tsheet.getAttribute("data-toggle-sheet");
+        if (quickSelected.has(name)) quickSelected.delete(name);
+        else quickSelected.add(name);
+        tsheet.classList.toggle("on", quickSelected.has(name));
+        const btn = $("continueQuickSheet");
+        if (btn) {
+          btn.disabled = !quickSelected.size;
+          btn.textContent = quickSelected.size ? "Continue · " + quickSelected.size : "Continue";
+        }
+      }
+      const toggle = e.target.closest("[data-toggle-common]");
+      if (toggle) {
+        const name = toggle.getAttribute("data-toggle-common");
+        if (quickSelected.has(name)) quickSelected.delete(name);
+        else quickSelected.add(name);
+        render();
+        if (sheetName === "quickPick") renderSheet();
+      }
+      if (clicked(e, "continueQuick") || clicked(e, "continueQuickSheet")) {
+        quickRows = [...quickSelected].map((name) => ({ name, cost: "", price: "" }));
+        openSheet("quickPrices");
+      }
+      if (clicked(e, "saveQuick")) saveQuickItems();
+      if (clicked(e, "saveCustomer")) saveCustomer();
+      const qtyBtn = e.target.closest("[data-qty]");
+      if (qtyBtn) {
+        const [id, q] = qtyBtn.getAttribute("data-qty").split(":");
+        setQty(id, Number(q));
+        render();
+      }
+      const tenderBtn = e.target.closest("[data-tender]");
+      if (tenderBtn) { cashTendered = Number(tenderBtn.getAttribute("data-tender")); renderSheet(); }
+      const openCust = e.target.closest("[data-open-cust]");
+      if (openCust) { selectedCustomer = openCust.getAttribute("data-open-cust"); paymentAmount = ""; overpayAction = null; openSheet("customer"); }
+      const pickCust = e.target.closest("[data-pick-cust]");
+      if (pickCust) { selectedCustomer = pickCust.getAttribute("data-pick-cust"); renderSheet(); }
+      const editItem = e.target.closest("[data-edit-item]");
+      if (editItem) openEditItem(editItem.getAttribute("data-edit-item"));
+      const overpay = e.target.closest("[data-overpay]");
+      if (overpay) { overpayAction = overpay.getAttribute("data-overpay"); renderSheet(); }
+    });
+
+    function leftoverAction() {
+      const c = customers.find((x) => x.id === selectedCustomer);
+      if (!c) return null;
+      const pay = numOrNull(paymentAmount);
+      if (pay == null) return null;
+      const leftover = round2(pay - c.balance);
+      return leftover > 0 ? overpayAction : null;
+    }
+
+    if ($("search")) $("search").addEventListener("input", (e) => { query = e.target.value; render(); });
+    document.addEventListener("input", (e) => {
+      if (e.target.id === "tenderInput") { cashTendered = e.target.value === "" ? null : Number(e.target.value); renderSheet(); restoreFocus("tenderInput"); }
+      if (e.target.id === "chargeSearch") renderSheet();
+      if (e.target.id === "payInput") { paymentAmount = e.target.value; overpayAction = null; renderSheet(); restoreFocus("payInput"); }
+      if (itemDraft) {
+        if (e.target.id === "itemName") itemDraft.name = e.target.value;
+        if (e.target.id === "itemStock") itemDraft.stock = e.target.value;
+        if (e.target.id === "itemCost") { itemDraft.cost = e.target.value; itemDraft.priceManual = false; }
+        if (e.target.id === "itemMarkup") { itemDraft.markup = e.target.value; itemDraft.priceManual = false; }
+        if (e.target.id === "itemPrice") { itemDraft.price = e.target.value; itemDraft.priceManual = true; }
+        if (e.target.id && e.target.id.startsWith("item")) { renderSheet(); restoreFocus(e.target.id); }
+      }
+      const qcost = e.target.getAttribute && e.target.getAttribute("data-qcost");
+      const qprice = e.target.getAttribute && e.target.getAttribute("data-qprice");
+      if (qcost != null && quickRows) {
+        const i = Number(qcost);
+        quickRows[i].cost = e.target.value;
+        const cost = numOrNull(quickRows[i].cost);
+        if (cost != null) quickRows[i].price = String(roundUpPeso(cost * (1 + defaultMarkup / 100)));
+        renderSheet();
+        restoreFocusAttr("data-qcost", i);
+      }
+      if (qprice != null && quickRows) {
+        const i = Number(qprice);
+        quickRows[i].price = e.target.value;
+      }
+    });
+
+    if ($("catScroller")) $("catScroller").addEventListener("scroll", updateCatFade, { passive: true });
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      if (getThemePref() === "system") applyTheme("system");
+    });
+
+    $("showSignupLink").addEventListener("click", (e) => {
+      e.preventDefault();
+      $("loginPanel").classList.add("hidden");
+      $("signupPanel").classList.remove("hidden");
+    });
+    $("showLoginLink").addEventListener("click", (e) => {
+      e.preventDefault();
+      $("signupPanel").classList.add("hidden");
+      $("loginPanel").classList.remove("hidden");
+    });
+    $("loginBtn").addEventListener("click", async () => {
+      if (!sb) { toast("Couldn't load the sign-in service"); return; }
+      const email = $("loginEmail").value.trim();
+      const password = $("loginPassword").value;
+      if (!email || !password) { toast("Enter email and password"); return; }
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) { toast(calmError(error, "Could not log in")); return; }
+      await proceedAfterAuth(data.user);
+    });
+    $("signupBtn").addEventListener("click", async () => {
+      if (!sb) { toast("Couldn't load the sign-in service"); return; }
+      const email = $("signupEmail").value.trim();
+      const password = $("signupPassword").value;
+      if (!email || !password) { toast("Fill in all fields"); return; }
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) { toast(calmError(error, "Could not create the account")); return; }
+      if (data.session) await proceedAfterAuth(data.user);
+      else {
+        toast("Check your email to confirm your account, then log in");
+        $("signupPanel").classList.add("hidden");
+        $("loginPanel").classList.remove("hidden");
+      }
+    });
+    $("storeNameContinueBtn").addEventListener("click", async () => {
+      if (!sb) return;
+      const name = $("onboardStoreNameInput").value.trim();
+      if (!name) { toast("Enter your store or your name"); return; }
+      const { error } = await sb.auth.updateUser({ data: { store_name: name } });
+      if (error) { toast(calmError(error, "Couldn't save your name")); return; }
+      currentUser.user_metadata = { ...currentUser.user_metadata, store_name: name };
+      justCompletedOnboarding = true;
+      showPinScreen("setup");
+    });
+    $("welcomeContinueBtn").addEventListener("click", () => { unlockApp(); });
+    $("pinEntryInput").addEventListener("input", async (e) => {
+      const val = e.target.value.replace(/\D/g, "").slice(0, 4);
+      e.target.value = val;
+      if (val.length === 4) {
+        const hash = await sha256Hex(val);
+        let savedHash = null;
+        try { savedHash = localStorage.getItem(pinHashKey(currentUser.id)); } catch (err) {}
+        if (hash === savedHash) unlockApp();
+        else {
+          $("pinEntryError").classList.remove("hidden");
+          e.target.value = "";
+        }
+      }
+    });
+    $("pinForgotLink").addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (sb) await sb.auth.signOut();
+      currentUser = null;
+      showAuthScreen();
+    });
+    ["pinSetupInput", "pinConfirmInput"].forEach((id) => {
+      $(id).addEventListener("input", (e) => {
+        e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4);
+      });
+    });
+    $("pinSetupBtn").addEventListener("click", async () => {
+      const pin = $("pinSetupInput").value;
+      const confirmPin = $("pinConfirmInput").value;
+      if (pin.length !== 4 || confirmPin.length !== 4) { toast("Enter a 4-digit PIN"); return; }
+      if (pin !== confirmPin) { $("pinSetupError").classList.remove("hidden"); return; }
+      const hash = await sha256Hex(pin);
+      try { localStorage.setItem(pinHashKey(currentUser.id), hash); } catch (err) {}
+      if (justCompletedOnboarding) {
+        justCompletedOnboarding = false;
+        showWelcomeScreen();
+      } else {
+        unlockApp();
+      }
+    });
+    $("pinSetupCancelLink").addEventListener("click", (e) => {
+      e.preventDefault();
+      if (unlocked || $("app").classList.contains("hidden") === false) {
+        /* returning from change-PIN */
+      }
+      if (currentUser && currentUser.user_metadata?.store_name && (unlocked || true)) {
+        /* If the app was already in use, go back in. If first setup, cancel shouldn't be visible. */
+        if (!$("pinSetupCancelRow").classList.contains("hidden")) unlockApp();
+      }
+    });
+
+    $("loginPassword").addEventListener("keydown", (e) => { if (e.key === "Enter") $("loginBtn").click(); });
+    $("loginEmail").addEventListener("keydown", (e) => { if (e.key === "Enter") $("loginPassword").focus(); });
+
+    async function initAuth() {
+      if (!supabaseReady || !sb) {
+        toast("Could not load the sign-in service. Check your connection and reload.");
+        return;
+      }
+      const { data: { session }, error } = await sb.auth.getSession();
+      if (error) {
+        toast("Something went wrong loading the app. Check your connection and reload.");
+        showAuthScreen();
+        return;
+      }
+      if (!session) {
+        showAuthScreen();
+        return;
+      }
+      currentUser = session.user;
+      if (!currentUser.user_metadata?.store_name) {
+        showStoreNameScreen();
+        return;
+      }
+      let savedHash = null;
+      try { savedHash = localStorage.getItem(pinHashKey(currentUser.id)); } catch (err) {}
+      showPinScreen(savedHash ? "entry" : "setup");
+    }
+
+    initAuth().catch((err) => {
+      console.error(err);
+      toast("Something went wrong loading the app. Check your connection and reload.");
+      showAuthScreen();
+    });
+
+  </script>
+</body>
+</html>
